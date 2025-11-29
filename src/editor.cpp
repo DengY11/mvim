@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <cctype>
+#include "file_reader.hpp"
 
 static constexpr int CTRL_u = 'U'-64; 
 static constexpr int CTRL_R = 'R'-64; 
@@ -105,7 +106,7 @@ Editor::Editor(const std::optional<std::filesystem::path>& file)
     message = std::string("background=") + v;
   });
 
-
+  load_rc();
 }
 
 void Editor::run() {
@@ -320,6 +321,30 @@ void Editor::execute_command() {
     return;
   }
   if (!registry.execute(cmd, args)) { message = "unknown command: " + cmd; }
+}
+
+void Editor::load_rc() {
+  std::error_code ec;
+  const char* home = std::getenv("HOME");
+  if (!home) return;
+  auto p = std::filesystem::path(home) / ".mvimrc";
+  if (!std::filesystem::exists(p, ec)) return;
+  std::vector<std::string> lines; std::string msg;
+  if (!mmapReadLines(p, lines, msg)) { message = msg; return; }
+  for (std::string s : lines) {
+    auto isspace_fn = [](unsigned char c){ return std::isspace(c) != 0; };
+    size_t i = 0; while (i < s.size() && isspace_fn((unsigned char)s[i])) i++;
+    size_t j = s.size(); while (j > i && isspace_fn((unsigned char)s[j-1])) j--;
+    s = (j > i) ? s.substr(i, j - i) : std::string();
+    if (s.empty()) continue;
+    if (s[0] == '#' || s[0] == '"') continue;
+    if (s.size() >= 2 && s[0] == '/' && s[1] == '/') continue;
+    if (!s.empty() && s[0] == ':') s.erase(s.begin());
+    std::string old = cmdline;
+    cmdline = s;
+    execute_command();
+    cmdline = old;
+  }
 }
 
 static std::vector<int> kmp_build(const std::string& pat) {

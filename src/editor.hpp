@@ -91,4 +91,5 @@ private:
   void yank_selection();
   void set_tab_width(int width);
   void insert_pair(int ch);
+  void load_rc();
 };
