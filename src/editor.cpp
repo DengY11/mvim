@@ -203,12 +203,12 @@ void Editor::handle_normal_input(int ch) {
     } break;
     case 'w': {
       size_t n = input.takeCount(); if (n == 0) n = 1;
-      if (pending_op != PendingOp::None) {
-        enter_visual_char();
-        while (n--) move_to_next_word_left();
-        if (pending_op == PendingOp::Delete) { delete_selection(); }
-        else if (pending_op == PendingOp::Yank) { yank_selection(); }
-        exit_visual();
+      if (pending_op == PendingOp::Delete) {
+        // 支持计数：重复执行 n 次
+        while (n--) delete_to_next_word();
+        pending_op = PendingOp::None;
+      } else if (pending_op == PendingOp::Yank) {
+        while (n--) yank_to_next_word();
         pending_op = PendingOp::None;
       } else {
         while (n--) move_to_next_word_left();
@@ -321,6 +321,81 @@ void Editor::execute_command() {
     return;
   }
   if (!registry.execute(cmd, args)) { message = "unknown command: " + cmd; }
+}
+
+void Editor::delete_to_next_word() {
+  Cursor old = cur;
+  move_to_next_word_left();
+  Cursor end = cur;
+  cur = old;
+  if (end.row < old.row || (end.row == old.row && end.col <= old.col)) return;
+  begin_group();
+  reg.lines.clear(); reg.linewise = false;
+  if (old.row == end.row) {
+    const auto& s = buf.line(old.row);
+    int c0 = std::clamp(old.col, 0, (int)s.size());
+    int c1 = std::clamp(end.col, 0, (int)s.size());
+    reg.lines = { s.substr(c0, c1 - c0) };
+    std::string neu = s.substr(0, c0) + s.substr(c1);
+    push_op({Operation::ReplaceLine, old.row, c0, s, neu});
+    buf.line(old.row) = neu;
+    cur.row = old.row; cur.col = c0;
+  } else {
+    const auto& first = buf.line(old.row);
+    const auto& last  = buf.line(end.row);
+    int c0 = std::clamp(old.col, 0, (int)first.size());
+    int c1 = std::clamp(end.col, 0, (int)last.size());
+    std::string out;
+    out += first.substr(c0);
+    out += '\n';
+    for (int r = old.row + 1; r <= end.row - 1; ++r) { out += buf.line(r); out += '\n'; }
+    out += last.substr(0, c1);
+    reg.lines = { out };
+    reg.linewise = false;
+    std::string neu_first = first.substr(0, c0) + last.substr(c1);
+    push_op({Operation::ReplaceLine, old.row, c0, first, neu_first});
+    // 删除中间行块
+    if (end.row > old.row + 1) {
+      std::string mid;
+      for (int r = old.row + 1; r <= end.row; ++r) {
+        mid += buf.line(r);
+        if (r < end.row) mid += '\n';
+      }
+      push_op({Operation::DeleteLinesBlock, old.row + 1, 0, mid, std::string()});
+    }
+    buf.lines.erase(buf.lines.begin() + (old.row + 1), buf.lines.begin() + (end.row + 1));
+    buf.line(old.row) = neu_first;
+    cur.row = old.row; cur.col = (int)first.substr(0, c0).size();
+  }
+  modified = true; um.clear_redo();
+  commit_group();
+}
+
+void Editor::yank_to_next_word() {
+  Cursor old = cur;
+  move_to_next_word_left();
+  Cursor end = cur;
+  cur = old;
+  if (end.row < old.row || (end.row == old.row && end.col <= old.col)) return;
+  reg.lines.clear(); reg.linewise = false;
+  if (old.row == end.row) {
+    const auto& s = buf.line(old.row);
+    int c0 = std::clamp(old.col, 0, (int)s.size());
+    int c1 = std::clamp(end.col, 0, (int)s.size());
+    reg.lines = { s.substr(c0, c1 - c0) };
+  } else {
+    const auto& first = buf.line(old.row);
+    const auto& last  = buf.line(end.row);
+    int c0 = std::clamp(old.col, 0, (int)first.size());
+    int c1 = std::clamp(end.col, 0, (int)last.size());
+    std::string out;
+    out += first.substr(c0);
+    out += '\n';
+    for (int r = old.row + 1; r <= end.row - 1; ++r) { out += buf.line(r); out += '\n'; }
+    out += last.substr(0, c1);
+    reg.lines = { out };
+    reg.linewise = false;
+  }
 }
 
 void Editor::load_rc() {

@@ -74,6 +74,8 @@ private:
   void search_forward(const std::string& pattern);
   void search_backward(const std::string& pattern);
   void repeat_last_search(bool is_forward);
+  void delete_to_next_word();
+  void yank_to_next_word();
   void move_to_top();
   void move_to_bottom();
   void move_to_next_word_left();

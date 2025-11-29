@@ -1,6 +1,3 @@
-# Ignore generated large test file (as requested)
-*.txt
-
 # Ignore dot-prefixed directories anywhere in the repo
 **/.*/
 
