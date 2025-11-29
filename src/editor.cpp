@@ -21,6 +21,22 @@ static inline bool is_word(unsigned char c) {
 static inline bool is_symble(unsigned char c) {
   return !is_space(c) && !is_word(c);
 }
+static int next_word_start_same_line(const std::string& line, int col) {
+  int len = (int)line.size();
+  if (col < 0) col = 0; if (col > len) col = len;
+  if (col >= len) return len;
+  unsigned char c = (unsigned char)line[col];
+  if (is_space(c)) {
+    while (col < len && is_space((unsigned char)line[col])) col++;
+    return col;
+  }
+  if (is_word(c) || is_num(c)) {
+    while (col + 1 < len && (is_word((unsigned char)line[col + 1]) || is_num((unsigned char)line[col + 1]))) col++;
+    return std::min(len, col + 1);
+  }
+  while (col + 1 < len && is_symble((unsigned char)line[col + 1])) col++;
+  return std::min(len, col + 1);
+}
 Editor::Editor(const std::optional<std::filesystem::path>& file)
     : file_path(file) {
   bool ok; std::string m;
@@ -325,77 +341,32 @@ void Editor::execute_command() {
 
 void Editor::delete_to_next_word() {
   Cursor old = cur;
-  move_to_next_word_left();
-  Cursor end = cur;
-  cur = old;
-  if (end.row < old.row || (end.row == old.row && end.col <= old.col)) return;
+  const auto& s = buf.line(old.row);
+  int end_col = next_word_start_same_line(s, old.col);
+  Cursor end{old.row, end_col};
+  if (end.col <= old.col) return;
   begin_group();
   reg.lines.clear(); reg.linewise = false;
-  if (old.row == end.row) {
-    const auto& s = buf.line(old.row);
-    int c0 = std::clamp(old.col, 0, (int)s.size());
-    int c1 = std::clamp(end.col, 0, (int)s.size());
-    reg.lines = { s.substr(c0, c1 - c0) };
-    std::string neu = s.substr(0, c0) + s.substr(c1);
-    push_op({Operation::ReplaceLine, old.row, c0, s, neu});
-    buf.line(old.row) = neu;
-    cur.row = old.row; cur.col = c0;
-  } else {
-    const auto& first = buf.line(old.row);
-    const auto& last  = buf.line(end.row);
-    int c0 = std::clamp(old.col, 0, (int)first.size());
-    int c1 = std::clamp(end.col, 0, (int)last.size());
-    std::string out;
-    out += first.substr(c0);
-    out += '\n';
-    for (int r = old.row + 1; r <= end.row - 1; ++r) { out += buf.line(r); out += '\n'; }
-    out += last.substr(0, c1);
-    reg.lines = { out };
-    reg.linewise = false;
-    std::string neu_first = first.substr(0, c0) + last.substr(c1);
-    push_op({Operation::ReplaceLine, old.row, c0, first, neu_first});
-    // 删除中间行块
-    if (end.row > old.row + 1) {
-      std::string mid;
-      for (int r = old.row + 1; r <= end.row; ++r) {
-        mid += buf.line(r);
-        if (r < end.row) mid += '\n';
-      }
-      push_op({Operation::DeleteLinesBlock, old.row + 1, 0, mid, std::string()});
-    }
-    buf.lines.erase(buf.lines.begin() + (old.row + 1), buf.lines.begin() + (end.row + 1));
-    buf.line(old.row) = neu_first;
-    cur.row = old.row; cur.col = (int)first.substr(0, c0).size();
-  }
+  int c0 = std::clamp(old.col, 0, (int)s.size());
+  int c1 = std::clamp(end.col, 0, (int)s.size());
+  reg.lines = { s.substr(c0, c1 - c0) };
+  std::string neu = s.substr(0, c0) + s.substr(c1);
+  push_op({Operation::ReplaceLine, old.row, c0, s, neu});
+  buf.line(old.row) = neu;
+  cur.row = old.row; cur.col = c0;
   modified = true; um.clear_redo();
   commit_group();
 }
 
 void Editor::yank_to_next_word() {
   Cursor old = cur;
-  move_to_next_word_left();
-  Cursor end = cur;
-  cur = old;
-  if (end.row < old.row || (end.row == old.row && end.col <= old.col)) return;
+  const auto& s = buf.line(old.row);
+  int end_col = next_word_start_same_line(s, old.col);
+  if (end_col <= old.col) return;
+  int c0 = std::clamp(old.col, 0, (int)s.size());
+  int c1 = std::clamp(end_col, 0, (int)s.size());
   reg.lines.clear(); reg.linewise = false;
-  if (old.row == end.row) {
-    const auto& s = buf.line(old.row);
-    int c0 = std::clamp(old.col, 0, (int)s.size());
-    int c1 = std::clamp(end.col, 0, (int)s.size());
-    reg.lines = { s.substr(c0, c1 - c0) };
-  } else {
-    const auto& first = buf.line(old.row);
-    const auto& last  = buf.line(end.row);
-    int c0 = std::clamp(old.col, 0, (int)first.size());
-    int c1 = std::clamp(end.col, 0, (int)last.size());
-    std::string out;
-    out += first.substr(c0);
-    out += '\n';
-    for (int r = old.row + 1; r <= end.row - 1; ++r) { out += buf.line(r); out += '\n'; }
-    out += last.substr(0, c1);
-    reg.lines = { out };
-    reg.linewise = false;
-  }
+  reg.lines = { s.substr(c0, c1 - c0) };
 }
 
 void Editor::load_rc() {
