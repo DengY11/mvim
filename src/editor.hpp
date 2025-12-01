@@ -76,6 +76,8 @@ private:
   void repeat_last_search(bool is_forward);
   void delete_to_next_word();
   void yank_to_next_word();
+  void delete_to_word_end();
+  void yank_to_word_end();
   void move_to_top();
   void move_to_bottom();
   void move_to_next_word_left();

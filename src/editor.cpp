@@ -37,6 +37,29 @@ static int next_word_start_same_line(const std::string& line, int col) {
   while (col + 1 < len && is_symble((unsigned char)line[col + 1])) col++;
   return std::min(len, col + 1);
 }
+static int next_word_end_same_line(const std::string& line, int col) {
+  int len = (int)line.size();
+  if (col < 0) col = 0; if (col > len) col = len;
+  if (col >= len) return len;
+  unsigned char c = (unsigned char)line[col];
+  if (is_space(c)) {
+    while (col < len && is_space((unsigned char)line[col])) col++;
+    if (col >= len) return len;
+    unsigned char c2 = (unsigned char)line[col];
+    if (is_word(c2) || is_num(c2)) {
+      while (col + 1 < len && (is_word((unsigned char)line[col + 1]) || is_num((unsigned char)line[col + 1]))) col++;
+      return std::min(len, col + 1);
+    }
+    while (col + 1 < len && is_symble((unsigned char)line[col + 1])) col++;
+    return std::min(len, col + 1);
+  }
+  if (is_word(c) || is_num(c)) {
+    while (col + 1 < len && (is_word((unsigned char)line[col + 1]) || is_num((unsigned char)line[col + 1]))) col++;
+    return std::min(len, col + 1);
+  }
+  while (col + 1 < len && is_symble((unsigned char)line[col + 1])) col++;
+  return std::min(len, col + 1);
+}
 Editor::Editor(const std::optional<std::filesystem::path>& file)
     : file_path(file) {
   bool ok; std::string m;
@@ -230,7 +253,18 @@ void Editor::handle_normal_input(int ch) {
         while (n--) move_to_next_word_left();
       }
     } break;
-    case 'e': { size_t n = input.takeCount(); if (n == 0) n = 1; while (n--) move_to_next_word_right(); } break;
+    case 'e': {
+      size_t n = input.takeCount(); if (n == 0) n = 1;
+      if (pending_op == PendingOp::Delete) {
+        while (n--) delete_to_word_end();
+        pending_op = PendingOp::None;
+      } else if (pending_op == PendingOp::Yank) {
+        while (n--) yank_to_word_end();
+        pending_op = PendingOp::None;
+      } else {
+        while (n--) move_to_next_word_right();
+      }
+    } break;
     case 'b': { size_t n = input.takeCount(); if (n == 0) n = 1; while (n--) move_to_previous_word_left(); } break;
     case '^': move_to_beginning_of_line(); break;
     case '$': move_to_end_of_line(); break;
@@ -362,6 +396,36 @@ void Editor::yank_to_next_word() {
   Cursor old = cur;
   const auto& s = buf.line(old.row);
   int end_col = next_word_start_same_line(s, old.col);
+  if (end_col <= old.col) return;
+  int c0 = std::clamp(old.col, 0, (int)s.size());
+  int c1 = std::clamp(end_col, 0, (int)s.size());
+  reg.lines.clear(); reg.linewise = false;
+  reg.lines = { s.substr(c0, c1 - c0) };
+}
+
+void Editor::delete_to_word_end() {
+  Cursor old = cur;
+  const auto& s = buf.line(old.row);
+  int end_col = next_word_end_same_line(s, old.col);
+  Cursor end{old.row, end_col};
+  if (end.col <= old.col) return;
+  begin_group();
+  reg.lines.clear(); reg.linewise = false;
+  int c0 = std::clamp(old.col, 0, (int)s.size());
+  int c1 = std::clamp(end.col, 0, (int)s.size());
+  reg.lines = { s.substr(c0, c1 - c0) };
+  std::string neu = s.substr(0, c0) + s.substr(c1);
+  push_op({Operation::ReplaceLine, old.row, c0, s, neu});
+  buf.line(old.row) = neu;
+  cur.row = old.row; cur.col = c0;
+  modified = true; um.clear_redo();
+  commit_group();
+}
+
+void Editor::yank_to_word_end() {
+  Cursor old = cur;
+  const auto& s = buf.line(old.row);
+  int end_col = next_word_end_same_line(s, old.col);
   if (end_col <= old.col) return;
   int c0 = std::clamp(old.col, 0, (int)s.size());
   int c1 = std::clamp(end_col, 0, (int)s.size());
