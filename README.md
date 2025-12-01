@@ -6,8 +6,8 @@
 
 ## 简介（中文）
 - 这是一个最小Vim风格的文本编辑器。
-- 使用 C++20 编写，模块化设计，便于扩展。
-- 为了编译，你需要安装 ncurses 库（Linux/FreeBSD/macOS）。
+- 使用C++20编写，模块化设计，便于扩展。
+- 为了编译，你需要安装ncurses库（Linux/FreeBSD/macOS）。
 
 ### 性能与大文件
 - 读取实现基于 POSIX `mmap`，并结合 `madvise(MADV_SEQUENTIAL)` 做顺序预读，以降低系统调用与缺页开销。

@@ -2,8 +2,8 @@
 /*
  * ITerminal
  *
- * 作用：终端/图形后端抽象；提供尺寸、清屏、绘制文本、光标移动、刷新等能力。
- * 目的：与具体实现（ncurses/headless/其他）解耦，支持多后端切换与测试桩。
+ * Purpose: abstract terminal backend (size, clear, draw, cursor, refresh).
+ * Goal: decouple from concrete impls (ncurses/headless/etc), enable testing.
  */
 #include <string>
 

@@ -220,7 +220,7 @@ void Editor::handle_normal_input(int ch) {
     case 'w': {
       size_t n = input.takeCount(); if (n == 0) n = 1;
       if (pending_op == PendingOp::Delete) {
-        // 支持计数：重复执行 n 次
+        // support count: repeat n times
         while (n--) delete_to_next_word();
         pending_op = PendingOp::None;
       } else if (pending_op == PendingOp::Yank) {

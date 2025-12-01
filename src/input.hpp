@@ -3,8 +3,8 @@
 /*
  * Input
  *
- * 作用：解析 Normal 模式下的双击键序前缀（dd/yy），提供最小状态机。
- * 扩展：预留计数前缀与更通用的键序解析，不耦合具体编辑动作。
+ * Purpose: parse Normal mode double key prefixes (dd/yy) with minimal state.
+ * Extend: supports count prefixes; decoupled from concrete editing actions.
  */
 
 class Input {

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-生成大文件用于测试编辑器性能
+Generate a large text file to test editor performance.
 """
 import os
 import random
@@ -8,16 +8,16 @@ import string
 
 def generate_large_file(filename, target_size_mb, line_length=80):
     """
-    生成指定大小的大文件
-    
+    Generate a large file of the specified size.
+
     Args:
-        filename: 输出文件名
-        target_size_mb: 目标文件大小（MB）
-        line_length: 每行平均长度
+        filename: output file name
+        target_size_mb: target file size in MB
+        line_length: average line length (hint, not strict)
     """
     target_size_bytes = target_size_mb * 1024 * 1024
     
-    # 生成一些常见的代码模式和单词
+    # Common code patterns and words
     code_patterns = [
         "#include <iostream>",
         "int main() {",
@@ -56,32 +56,32 @@ def generate_large_file(filename, target_size_mb, line_length=80):
         "include", "define", "typedef", "struct", "union", "enum"
     ]
     
-    print(f"开始生成 {target_size_mb}MB 的文件: {filename}")
+    print(f"Start generating {target_size_mb} MB file: {filename}")
     
     with open(filename, 'w', encoding='utf-8') as f:
         current_size = 0
         line_count = 0
         
         while current_size < target_size_bytes:
-            # 随机选择内容类型
+            # Randomize content type for variety
             content_type = random.choice(['code', 'text', 'comment', 'blank'])
-            
+
             if content_type == 'code' and random.random() < 0.3:
-                # 30%概率插入代码模式
+                # 30% chance to insert a code pattern
                 line = random.choice(code_patterns)
             elif content_type == 'text':
-                # 生成随机文本行
+                # Generate a random text line
                 word_count = random.randint(5, 15)
                 words = [random.choice(common_words) for _ in range(word_count)]
                 line = ' '.join(words) + random.choice([';', ' {', '', ''])
             elif content_type == 'comment':
-                # 生成注释
+                # Generate a comment line
                 line = '// ' + ' '.join(random.choice(common_words) for _ in range(random.randint(3, 8)))
             else:
-                # 空行或简单行
+                # Blank line or simple line
                 line = ''
             
-            # 添加行尾
+            # Append newline
             if line:
                 line += '\n'
             else:
@@ -91,31 +91,31 @@ def generate_large_file(filename, target_size_mb, line_length=80):
             current_size += len(line.encode('utf-8'))
             line_count += 1
             
-            # 每10000行打印一次进度
+            # Print progress every 10,000 lines
             if line_count % 10000 == 0:
                 progress_mb = current_size / (1024 * 1024)
-                print(f"进度: {progress_mb:.1f}MB / {target_size_mb}MB (行数: {line_count})")
+                print(f"Progress: {progress_mb:.1f} MB / {target_size_mb} MB (lines: {line_count})")
     
     actual_size_mb = os.path.getsize(filename) / (1024 * 1024)
-    print(f"生成完成!")
-    print(f"文件名: {filename}")
-    print(f"实际大小: {actual_size_mb:.2f} MB")
-    print(f"总行数: {line_count:,}")
-    print(f"平均每行长度: {current_size/line_count:.1f} 字符")
+    print("Done!")
+    print(f"File: {filename}")
+    print(f"Actual size: {actual_size_mb:.2f} MB")
+    print(f"Total lines: {line_count:,}")
+    print(f"Average line length: {current_size/line_count:.1f} chars")
 
 if __name__ == "__main__":
     import sys
     
-    # 默认参数
+    # Default parameters
     filename = "large_test_file.txt"
     size_mb = 100
     
-    # 解析命令行参数
+    # Parse CLI arguments
     if len(sys.argv) > 1:
         try:
             size_mb = int(sys.argv[1])
         except ValueError:
-            print("用法: python generate_large_file.py [大小(MB)] [文件名]")
+            print("Usage: python generate_large_file.py [size(MB)] [filename]")
             sys.exit(1)
     
     if len(sys.argv) > 2:

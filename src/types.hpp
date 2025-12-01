@@ -2,8 +2,8 @@
 /*
  * Types
  *
- * 作用：共享的轻量数据结构与枚举（Mode/Cursor/Viewport）。
- * 原则：仅承载简单状态，避免跨模块强耦合与业务逻辑。
+ * Purpose: shared lightweight structs/enums (Mode/Cursor/Viewport).
+ * Principle: carry simple state; avoid cross-module coupling/business logic.
  */
 #include <filesystem>
 

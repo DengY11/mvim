@@ -2,9 +2,9 @@
 /*
  * Renderer
  *
- * 作用：负责文本区/状态栏/命令行渲染与视口滚动；不直接依赖 ncurses。
- * 依赖：通过 ITerminal 抽象绘制与光标移动，便于替换渲染后端。
- * 约束：保持无业务状态，接受 Editor 状态的只读快照进行绘制。
+ * Purpose: render text/status/command line and manage viewport scrolling.
+ * Dependency: draws via ITerminal to allow backend replacement.
+ * Constraint: stateless; receives snapshots from Editor to render.
  */
 #include <string>
 #include <optional>

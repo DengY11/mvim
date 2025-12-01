@@ -33,7 +33,7 @@ bool TextBuffer::write_file(const std::filesystem::path& path, std::string& msg)
   tmp += ".tmp";
   int fd = ::open(tmp.string().c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
   if (fd < 0) {
-    msg = std::string("写入失败：") + tmp.string();
+    msg = std::string("write file failed: ") + tmp.string();
     return false;
   }
   size_t total = 0;

@@ -2,8 +2,8 @@
 /*
  * NcursesTerminal
  *
- * 作用：ITerminal 的 ncurses 实现，绑定终端缓冲与输入模式。
- * 说明：仅提供绘制相关接口实现；初始化/还原由 Terminal RAII 管理。
+ * Purpose: ITerminal implementation using ncurses for drawing and input mode.
+ * Note: initialization/teardown is managed by Terminal RAII wrapper.
  */
 #include "iterminal.hpp"
 #include <ncurses.h>

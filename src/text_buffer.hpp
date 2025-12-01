@@ -2,9 +2,9 @@
 /*
  * TextBuffer
  *
- * 作用：基于行的文本缓冲，提供行/字符操作与文件读写。
- * 特性：默认安全写入（写入 .tmp → fsync → 原子重命名），避免数据损坏。
- * 关注：接口保持简单（line/insert/delete/split），便于后续替换为 Gap/Rope。
+ * Purpose: line-based text buffer supporting line/char ops and file I/O.
+ * Feature: safe writes (write .tmp → fsync/fdatasync → atomic rename).
+ * Note: keep API simple (line/insert/delete/split), future Gap/Rope swap.
  */
 #include <string>
 #include <vector>

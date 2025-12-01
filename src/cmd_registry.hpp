@@ -2,8 +2,8 @@
 /*
  * CommandRegistry
  *
- * 作用：命令注册与分发中心，统一管理 Ex 命令执行入口。
- * 设计：名称到处理器的映射，处理器接受参数向量；Editor 负责解析与路由。
+ * Purpose: register and dispatch Ex commands.
+ * Design: map name → handler (args vector); Editor parses and routes.
  */
 #include <string>
 #include <unordered_map>
