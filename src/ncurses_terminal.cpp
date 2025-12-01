@@ -1,4 +1,6 @@
 #include "ncurses_terminal.hpp"
+#include <cwchar>
+#include <vector>
 
 NcursesTerminal::NcursesTerminal() {
   if (has_colors()) {
@@ -22,7 +24,7 @@ void NcursesTerminal::clear() { erase(); }
 
 void NcursesTerminal::drawText(int row, int col, const std::string& text) {
   if (has_colors()) attron(COLOR_PAIR(2));
-  mvaddnstr(row, col, text.c_str(), getSize().cols);
+  mvaddnstr(row, col, text.c_str(), (int)text.size());
   if (has_colors()) attroff(COLOR_PAIR(2));
 }
 
@@ -35,25 +37,25 @@ void NcursesTerminal::drawHighlighted(int row, int col, const std::string& text,
   hl_start = std::min(hl_start, len);
   if (hl_start > 0) {
     std::string left = text.substr(0, hl_start);
-    mvaddnstr(row, col, left.c_str(), cols);
+    mvaddnstr(row, col, left.c_str(), (int)left.size());
     col += (int)left.size();
   }
   if (hl_end > hl_start) {
     std::string mid = text.substr(hl_start, hl_end - hl_start);
     attron(A_REVERSE);
-    mvaddnstr(row, col, mid.c_str(), cols);
+    mvaddnstr(row, col, mid.c_str(), (int)mid.size());
     attroff(A_REVERSE);
     col += (int)mid.size();
   }
   if (hl_end < len) {
     std::string right = text.substr(hl_end);
-    mvaddnstr(row, col, right.c_str(), cols);
+    mvaddnstr(row, col, right.c_str(), (int)right.size());
   }
 }
 
 void NcursesTerminal::drawColored(int row, int col, const std::string& text, int color_pair_id) {
   if (has_colors()) attron(COLOR_PAIR(color_pair_id));
-  mvaddnstr(row, col, text.c_str(), getSize().cols);
+  mvaddnstr(row, col, text.c_str(), (int)text.size());
   if (has_colors()) attroff(COLOR_PAIR(color_pair_id));
 }
 

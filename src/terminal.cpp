@@ -1,6 +1,8 @@
 #include "terminal.hpp"
+#include <locale.h>
 
 Terminal::Terminal() {
+  setlocale(LC_ALL, "");
   initscr();
   raw();
   noecho();
@@ -11,4 +13,3 @@ Terminal::Terminal() {
 Terminal::~Terminal() {
   endwin();
 }
-

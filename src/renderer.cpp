@@ -73,7 +73,11 @@ void Renderer::render(ITerminal& term,
         term.drawText(i, indent, s);
       }
     }
-    if (!visual_active && enable_color) {
+    auto is_ascii_line = [](const std::string& t){
+      for (unsigned char c : t) { if (c >= 128) return false; }
+      return true;
+    };
+    if (!visual_active && enable_color && is_ascii_line(s)) {
       static const std::unordered_set<std::string> kwords = {
         "if", "else", "for", "while", "return", "true", "false", "null"
       };
