@@ -140,6 +140,10 @@ Editor::Editor(const std::optional<std::filesystem::path>& file)
     else if (v == "white") col = COLOR_WHITE;
     else if (v == "green") col = COLOR_GREEN;
     else if (v == "yellow") col = COLOR_YELLOW;
+    else if (v == "red") col = COLOR_RED;
+    else if (v == "blue") col = COLOR_BLUE;
+    else if (v == "magenta") col = COLOR_MAGENTA;
+    else if (v == "cyan") col = COLOR_CYAN;
     else { message = "set background: unknown color"; return; }
     term.setBackground(col);
     message = std::string("background=") + v;
