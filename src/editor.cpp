@@ -577,8 +577,7 @@ void Editor::delete_selection() {
       if (k < r1) block += '\n';
     }
     push_op({Operation::DeleteLinesBlock, r0, 0, block, std::string()});
-    if (r0 < end) buf.lines.erase(buf.lines.begin() + r0, buf.lines.begin() + end);
-    if (buf.empty()) buf.lines.emplace_back("");
+    if (r0 < end) buf.erase_lines(r0, end);
     cur.row = std::min(r0, buf.line_count() - 1);
     cur.col = 0;
   } else {
@@ -612,7 +611,7 @@ void Editor::delete_selection() {
         push_op({Operation::DeleteLinesBlock, r0 + 1, 0, mid, std::string()});
       }
       first = neu_first;
-      buf.lines.erase(buf.lines.begin() + (r0 + 1), buf.lines.begin() + (r1 + 1));
+      buf.erase_lines(r0 + 1, r1 + 1);
       cur.row = r0; cur.col = (int)left.size();
     }
   }
@@ -668,9 +667,9 @@ void Editor::delete_line() {
   reg.lines = { buf.line(cur.row) };
   reg.linewise = true;
   push_op({Operation::DeleteLine, cur.row, 0, buf.line(cur.row), std::string()});
-  buf.lines.erase(buf.lines.begin() + cur.row);
+  buf.erase_line(cur.row);
   if (cur.row >= buf.line_count()) cur.row = std::max(0, buf.line_count() - 1);
-  if (buf.empty()) buf.lines.emplace_back(""); cur.col = std::min(cur.col, (int)buf.line(cur.row).size());
+  cur.col = std::min(cur.col, (int)buf.line(cur.row).size());
   modified = true; um.clear_redo();
 }
 
@@ -688,8 +687,7 @@ void Editor::delete_lines_range(int start_row, int count) {
     reg.lines.push_back(s);
   }
   reg.linewise = true;
-  buf.lines.erase(buf.lines.begin() + start_row, buf.lines.begin() + start_row + n);
-  if (buf.empty()) buf.lines.emplace_back("");
+  buf.erase_lines(start_row, start_row + n);
   cur.row = std::min(start_row, std::max(0, buf.line_count() - 1));
   cur.col = std::min(cur.col, (int)buf.line(cur.row).size());
   modified = true; um.clear_redo();
@@ -702,7 +700,7 @@ void Editor::paste_below() {
   if (reg.linewise) {
     if (reg.lines.empty()) return;
     begin_group();
-    buf.lines.insert(buf.lines.begin() + insert_row, reg.lines.begin(), reg.lines.end());
+    buf.insert_lines(insert_row, reg.lines);
     for (size_t i = 0; i < reg.lines.size(); ++i) {
       push_op({Operation::InsertLine, insert_row + (int)i, 0, reg.lines[i], std::string()});
     }
@@ -729,7 +727,10 @@ void Editor::paste_below() {
       std::string left = s.substr(0, pos);
       std::string right = s.substr(pos);
       s = left + parts[0];
-      buf.lines.insert(buf.lines.begin() + insert_row, parts.begin() + 1, parts.end());
+      {
+        std::vector<std::string> tail(parts.begin() + 1, parts.end());
+        buf.insert_lines(insert_row, tail);
+      }
       push_op({Operation::InsertLine, insert_row, 0, parts[1], std::string()});
       for (size_t i = 2; i < parts.size(); ++i) {
         push_op({Operation::InsertLine, insert_row + (int)i - 1, 0, parts[i], std::string()});
@@ -744,14 +745,14 @@ void Editor::paste_below() {
 
 void Editor::insert_line_below() {
   int insert_row = cur.row + 1;
-  buf.lines.insert(buf.lines.begin() + insert_row, std::string());
+  buf.insert_line(insert_row, std::string());
   push_op({Operation::InsertLine, insert_row, 0, std::string(), std::string()});
   cur.row = insert_row; cur.col = 0; modified = true; um.clear_redo();
 }
 
 void Editor::insert_line_above() {
   int insert_row = cur.row;
-  buf.lines.insert(buf.lines.begin() + insert_row, std::string());
+  buf.insert_line(insert_row, std::string());
   push_op({Operation::InsertLine, insert_row, 0, std::string(), std::string()});
   cur.col = 0; modified = true; um.clear_redo();
 }
@@ -761,7 +762,7 @@ void Editor::split_line_at_cursor() {
   std::string left = s.substr(0, cur.col);
   std::string right = s.substr(cur.col);
   s = left;
-  buf.lines.insert(buf.lines.begin() + cur.row + 1, right);
+  buf.insert_line(cur.row + 1, right);
   push_op({Operation::InsertLine, cur.row + 1, 0, right, std::string()});
   cur.row++; cur.col = 0; modified = true; um.clear_redo();
 }
@@ -779,7 +780,7 @@ void Editor::backspace() {
     int old_row = cur.row;
     int old_col = prev.size();
     buf.line(cur.row - 1) = prev + curr;
-    buf.lines.erase(buf.lines.begin() + cur.row);
+    buf.erase_line(cur.row);
     push_op({Operation::ReplaceLine, old_row - 1, (int)prev.size(), prev, prev + curr});
     cur.row = old_row - 1; cur.col = old_col; modified = true; um.clear_redo();
   }

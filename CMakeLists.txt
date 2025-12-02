@@ -14,6 +14,9 @@ add_executable(mvim
   src/main.cpp
   src/terminal.cpp
   src/text_buffer.cpp
+  src/gap_buffer.cpp
+  src/line_index.cpp
+  src/text_buffer_core.cpp
   src/renderer.cpp
   src/input.cpp
   src/ncurses_terminal.cpp
@@ -34,3 +37,24 @@ endif()
 target_compile_options(mvim PRIVATE -Wall -Wextra -Wpedantic)
 
 message(STATUS "CXX standard: ${CMAKE_CXX_STANDARD}")
+
+add_executable(mvim_tests
+  src/text_buffer.cpp
+  src/gap_buffer.cpp
+  src/line_index.cpp
+  src/text_buffer_core.cpp
+  src/file_reader.cpp
+  tests/test_text_buffer.cpp
+)
+target_compile_features(mvim_tests PRIVATE cxx_std_20)
+target_compile_options(mvim_tests PRIVATE -Wall -Wextra -Wpedantic)
+target_include_directories(mvim_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+
+add_executable(mvim_bench
+  src/text_buffer.cpp
+  src/file_reader.cpp
+  tests/bench_large_delete.cpp
+)
+target_compile_features(mvim_bench PRIVATE cxx_std_20)
+target_compile_options(mvim_bench PRIVATE -O2)
+target_include_directories(mvim_bench PRIVATE ${CMAKE_SOURCE_DIR}/src)

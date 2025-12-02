@@ -46,10 +46,10 @@ void UndoManager::undo(TextBuffer& buf, Cursor& cur) {
         if (op.col <= (int)s.size()) s.insert(s.begin() + op.col, op.payload[0]);
       } break;
       case Operation::InsertLine: {
-        if (op.row < buf.line_count()) buf.lines.erase(buf.lines.begin() + op.row);
+        if (op.row < buf.line_count()) buf.erase_line(op.row);
       } break;
       case Operation::DeleteLine: {
-        buf.lines.insert(buf.lines.begin() + op.row, op.payload);
+        buf.insert_line(op.row, op.payload);
       } break;
       case Operation::ReplaceLine: {
         if (op.row >= 0 && op.row < buf.line_count()) buf.line(op.row) = op.payload;
@@ -58,7 +58,7 @@ void UndoManager::undo(TextBuffer& buf, Cursor& cur) {
         int start = op.row;
         int count = 0;
         for (size_t p = 0; p <= op.payload.size(); ++p) if (p == op.payload.size() || op.payload[p] == '\n') count++;
-        if (start >= 0 && start + count <= buf.line_count()) buf.lines.erase(buf.lines.begin() + start, buf.lines.begin() + start + count);
+        if (start >= 0 && start + count <= buf.line_count()) buf.erase_lines(start, start + count);
       } break;
       case Operation::DeleteLinesBlock: {
         int start = op.row;
@@ -70,7 +70,7 @@ void UndoManager::undo(TextBuffer& buf, Cursor& cur) {
           lines.emplace_back(op.payload.substr(st, pos - st));
           st = pos + 1;
         }
-        buf.lines.insert(buf.lines.begin() + start, lines.begin(), lines.end());
+        buf.insert_lines(start, lines);
       } break;
     }
   }
@@ -94,10 +94,10 @@ void UndoManager::redo(TextBuffer& buf, Cursor& cur) {
         if (op.col < (int)s.size()) s.erase(s.begin() + op.col);
       } break;
       case Operation::InsertLine: {
-        buf.lines.insert(buf.lines.begin() + op.row, op.payload);
+        buf.insert_line(op.row, op.payload);
       } break;
       case Operation::DeleteLine: {
-        if (op.row < buf.line_count()) buf.lines.erase(buf.lines.begin() + op.row);
+        if (op.row < buf.line_count()) buf.erase_line(op.row);
       } break;
       case Operation::ReplaceLine: {
         if (op.row >= 0 && op.row < buf.line_count()) buf.line(op.row) = op.alt_payload;
@@ -112,13 +112,13 @@ void UndoManager::redo(TextBuffer& buf, Cursor& cur) {
           lines.emplace_back(op.payload.substr(st, pos - st));
           st = pos + 1;
         }
-        buf.lines.insert(buf.lines.begin() + start, lines.begin(), lines.end());
+        buf.insert_lines(start, lines);
       } break;
       case Operation::DeleteLinesBlock: {
         int start = op.row;
         int count = 0;
         for (size_t p = 0; p <= op.payload.size(); ++p) if (p == op.payload.size() || op.payload[p] == '\n') count++;
-        if (start >= 0 && start + count <= buf.line_count()) buf.lines.erase(buf.lines.begin() + start, buf.lines.begin() + start + count);
+        if (start >= 0 && start + count <= buf.line_count()) buf.erase_lines(start, start + count);
       } break;
     }
   }
