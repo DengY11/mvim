@@ -330,9 +330,11 @@ void Editor::insert_pair(int ch) {
   push_op({Operation::InsertChar, cur.row, cur.col, std::string(1, (char)ch), std::string()});
   modified = true;
   cur.col++;
-  s.insert(s.begin() + cur.col, closing);
-  push_op({Operation::InsertChar, cur.row, cur.col, std::string(1, closing), std::string()});
-  modified = true;
+  if (!(cur.col < (int)s.size() && s[cur.col] == closing)) {
+    s.insert(s.begin() + cur.col, closing);
+    push_op({Operation::InsertChar, cur.row, cur.col, std::string(1, closing), std::string()});
+    modified = true;
+  }
   um.clear_redo();
 }
 
