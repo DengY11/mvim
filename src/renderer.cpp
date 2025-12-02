@@ -78,13 +78,19 @@ void Renderer::render(ITerminal& term,
         } else {
           term.drawText(i, indent, s);
         }
+        term.clearToEOL(i, indent + (int)s.size());
       } else if (mode == Mode::Visual) {
+        auto is_ascii_line = [](const std::string& t){ for (unsigned char c : t) { if (c >= 128) return false; } return true; };
+        if (!is_ascii_line(s)) {
+          if (line_idx >= r0 && line_idx <= r1) term.drawHighlighted(i, indent, s, 0, (int)s.size()); else term.drawText(i, indent, s);
+          term.clearToEOL(i, indent + (int)s.size());
+        } else {
         if (line_idx == r0 && line_idx == r1) {
           int c0 = std::min(visual_anchor.col, cur.col);
           int c1 = std::max(visual_anchor.col, cur.col);
           c0 = std::max(0, std::min(c0, (int)s.size()));
           c1 = std::max(0, std::min(c1, (int)s.size()));
-          term.drawHighlighted(i, indent, s, c0, c1 - c0 + 1);
+          term.drawHighlighted(i, indent, s, c0, c1 - c0);
         } else if (line_idx == r0) {
           int c0 = std::min(visual_anchor.col, cur.col);
           c0 = std::max(0, std::min(c0, (int)s.size()));
@@ -92,11 +98,13 @@ void Renderer::render(ITerminal& term,
         } else if (line_idx == r1) {
           int c1 = std::max(visual_anchor.col, cur.col);
           c1 = std::max(0, std::min(c1, (int)s.size()));
-          term.drawHighlighted(i, indent, s, 0, c1 + 1);
+          term.drawHighlighted(i, indent, s, 0, c1);
         } else if (line_idx > r0 && line_idx < r1) {
           term.drawHighlighted(i, indent, s, 0, (int)s.size());
         } else {
           term.drawText(i, indent, s);
+        }
+        term.clearToEOL(i, indent + (int)s.size());
         }
       } else {
         term.drawText(i, indent, s);
@@ -133,6 +141,7 @@ void Renderer::render(ITerminal& term,
       }
     } else if (!visual_active) {
       term.drawText(i, indent, s);
+      term.clearToEOL(i, indent + (int)s.size());
     }
   }
   std::string mode_str = (mode == Mode::Normal ? "NORMAL" : mode == Mode::Insert ? "INSERT" : mode == Mode::Command ? "COMMAND" : mode == Mode::Visual ? "VISUAL" : "VISUAL-LINE");

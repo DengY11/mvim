@@ -35,6 +35,16 @@ void NcursesTerminal::drawHighlighted(int row, int col, const std::string& text,
   if (hl_len < 0) hl_len = 0;
   int hl_end = std::min(len, hl_start + hl_len);
   hl_start = std::min(hl_start, len);
+  if (len == 0) {
+    int rem = std::max(0, cols - col);
+    if (rem > 0) {
+      std::string spaces(rem, ' ');
+      attron(A_REVERSE);
+      mvaddnstr(row, col, spaces.c_str(), rem);
+      attroff(A_REVERSE);
+    }
+    return;
+  }
   if (hl_start > 0) {
     std::string left = text.substr(0, hl_start);
     mvaddnstr(row, col, left.c_str(), (int)left.size());
@@ -72,4 +82,8 @@ void NcursesTerminal::setBackground(short color) {
   // Keep keyword pair background in sync
   init_pair(1, COLOR_YELLOW, bg_color_);
   erase();
+}
+void NcursesTerminal::clearToEOL(int row, int col) {
+  move(row, col);
+  clrtoeol();
 }

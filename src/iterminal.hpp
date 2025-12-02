@@ -19,4 +19,5 @@ public:
   virtual void drawColored(int row, int col, const std::string& text, int color_pair_id) = 0;
   virtual void moveCursor(int row, int col) = 0;
   virtual void refresh() = 0;
+  virtual void clearToEOL(int row, int col) = 0;
 };

@@ -19,6 +19,7 @@ public:
   void drawColored(int row, int col, const std::string& text, int color_pair_id) override;
   void moveCursor(int row, int col) override;
   void refresh() override;
+  void clearToEOL(int row, int col) override;
   void setBackground(short color);
 private:
   short bg_color_ = -1; // -1: default background
