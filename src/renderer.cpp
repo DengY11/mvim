@@ -2,6 +2,28 @@
 #include <sstream>
 #include <unordered_set>
 #include <cctype>
+#include <string>
+#include <algorithm>
+
+static std::string toLower(std::string s){ for(char& c: s) c = (char)std::tolower((unsigned char)c); return s; }
+static const std::unordered_set<std::string>& keywordsForExt(const std::string& ext){
+  static const std::unordered_set<std::string> def = {"if","else","for","while","return","true","false","null"};
+  static const std::unordered_set<std::string> cxx = {
+    "if","else","for","while","return","switch","case","break","continue","struct","class","public","private","protected","const","static","enum","sizeof","typedef","namespace","using","new","delete","true","false","null","include","void","int","char","float","double","long","short","signed","unsigned"
+  };
+  static const std::unordered_set<std::string> go = {
+    "package","import","func","var","const","type","struct","interface","if","else","for","range","return","go","defer","select","switch","case","map","chan","true","false","nil"
+  };
+  static const std::unordered_set<std::string> bash = {
+    "if","then","else","elif","fi","for","in","do","done","case","esac","function","local","export"
+  };
+  std::string e = toLower(ext);
+  if(e=="c") return cxx;
+  if(e=="cpp"||e=="cxx"||e=="cc"||e=="h"||e=="hpp"||e=="hxx") return cxx;
+  if(e=="go") return go;
+  if(e=="bash") return bash;
+  return def;
+}
 
 void Renderer::render(ITerminal& term,
                       const TextBuffer& buf,
@@ -31,6 +53,13 @@ void Renderer::render(ITerminal& term,
     ln_width = digits;
     indent = ln_width + 1; // one space after numbers
   }
+  std::string ext;
+  if (file_path) {
+    auto e = file_path->extension().string();
+    if (!e.empty() && e[0]=='.') e = e.substr(1);
+    ext = toLower(e);
+  }
+  const auto& kwords_global = keywordsForExt(ext);
   for (int i = 0; i < max_text_rows; ++i) {
     int line_idx = vp.top_line + i;
     if (line_idx >= buf.line_count()) break;
@@ -78,9 +107,6 @@ void Renderer::render(ITerminal& term,
       return true;
     };
     if (!visual_active && enable_color && is_ascii_line(s)) {
-      static const std::unordered_set<std::string> kwords = {
-        "if", "else", "for", "while", "return", "true", "false", "null"
-      };
       auto isWord = [](unsigned char c){ return std::isalnum(c) != 0 || c == '_'; };
       int cols = term.getSize().cols;
       int col = indent;
@@ -96,7 +122,7 @@ void Renderer::render(ITerminal& term,
           int start = p;
           while (p < n && isWord((unsigned char)s[p])) p++;
           std::string tok = s.substr(start, p - start);
-          if (kwords.find(tok) != kwords.end()) {
+          if (kwords_global.find(tok) != kwords_global.end()) {
             term.drawColored(i, col, tok, 1);
           } else {
             term.drawText(i, col, tok);
