@@ -60,10 +60,20 @@ void Renderer::render(ITerminal& term,
     ext = toLower(e);
   }
   const auto& kwords_global = keywordsForExt(ext);
+  int text_cols = std::max(0, cols - indent);
+  if (text_cols <= 0) vp.left_col = 0;
+  if (text_cols > 0) {
+    if (cur.col < vp.left_col) vp.left_col = cur.col;
+    else if (cur.col >= vp.left_col + text_cols) vp.left_col = cur.col - text_cols + 1;
+    if (vp.left_col < 0) vp.left_col = 0;
+  }
   for (int i = 0; i < max_text_rows; ++i) {
     int line_idx = vp.top_line + i;
     if (line_idx >= buf.line_count()) break;
     const auto& s = buf.line(line_idx);
+    int s_len = (int)s.size();
+    int start_col = std::min(std::max(0, vp.left_col), s_len);
+    int end_col = std::min(s_len, start_col + std::max(0, text_cols));
     if (show_line_numbers) {
       std::string num = std::to_string(line_idx + 1);
       std::string pad(std::max(0, ln_width - (int)num.size()), ' ');
@@ -74,62 +84,73 @@ void Renderer::render(ITerminal& term,
       int r1 = std::max(visual_anchor.row, cur.row);
       if (mode == Mode::VisualLine) {
         if (line_idx >= r0 && line_idx <= r1) {
-          term.drawHighlighted(i, indent, s, 0, (int)s.size());
+          std::string vis = s.substr(start_col, end_col - start_col);
+          term.drawHighlighted(i, indent, vis, 0, (int)vis.size());
+          term.clearToEOL(i, indent + (int)vis.size());
         } else {
-          term.drawText(i, indent, s);
+          std::string vis = s.substr(start_col, end_col - start_col);
+          term.drawText(i, indent, vis);
+          term.clearToEOL(i, indent + (int)vis.size());
         }
-        term.clearToEOL(i, indent + (int)s.size());
       } else if (mode == Mode::Visual) {
         auto is_ascii_line = [](const std::string& t){ for (unsigned char c : t) { if (c >= 128) return false; } return true; };
-        if (!is_ascii_line(s)) {
-          if (line_idx >= r0 && line_idx <= r1) term.drawHighlighted(i, indent, s, 0, (int)s.size()); else term.drawText(i, indent, s);
-          term.clearToEOL(i, indent + (int)s.size());
+        std::string vis = s.substr(start_col, end_col - start_col);
+        if (!is_ascii_line(vis)) {
+          if (line_idx >= r0 && line_idx <= r1) term.drawHighlighted(i, indent, vis, 0, (int)vis.size()); else term.drawText(i, indent, vis);
+          term.clearToEOL(i, indent + (int)vis.size());
         } else {
         if (line_idx == r0 && line_idx == r1) {
           int c0 = std::min(visual_anchor.col, cur.col);
           int c1 = std::max(visual_anchor.col, cur.col);
           c0 = std::max(0, std::min(c0, (int)s.size()));
           c1 = std::max(0, std::min(c1, (int)s.size()));
-          term.drawHighlighted(i, indent, s, c0, c1 - c0);
+          int hs = std::max(0, c0 - start_col);
+          int he = std::max(0, std::min(c1, end_col) - start_col);
+          int hlen = std::max(0, he - hs);
+          term.drawHighlighted(i, indent, vis, hs, hlen);
         } else if (line_idx == r0) {
           int c0 = std::min(visual_anchor.col, cur.col);
           c0 = std::max(0, std::min(c0, (int)s.size()));
-          term.drawHighlighted(i, indent, s, c0, (int)s.size() - c0);
+          int hs = std::max(0, c0 - start_col);
+          int hlen = std::max(0, end_col - std::max(start_col, c0));
+          term.drawHighlighted(i, indent, vis, hs, hlen);
         } else if (line_idx == r1) {
           int c1 = std::max(visual_anchor.col, cur.col);
           c1 = std::max(0, std::min(c1, (int)s.size()));
-          term.drawHighlighted(i, indent, s, 0, c1);
+          int hlen = std::max(0, std::min(c1, end_col) - start_col);
+          term.drawHighlighted(i, indent, vis, 0, hlen);
         } else if (line_idx > r0 && line_idx < r1) {
-          term.drawHighlighted(i, indent, s, 0, (int)s.size());
+          term.drawHighlighted(i, indent, vis, 0, (int)vis.size());
         } else {
-          term.drawText(i, indent, s);
+          term.drawText(i, indent, vis);
         }
-        term.clearToEOL(i, indent + (int)s.size());
+        term.clearToEOL(i, indent + (int)vis.size());
         }
       } else {
-        term.drawText(i, indent, s);
+        term.drawText(i, indent, s.substr(start_col, end_col - start_col));
       }
     }
     auto is_ascii_line = [](const std::string& t){
       for (unsigned char c : t) { if (c >= 128) return false; }
       return true;
     };
-    if (!visual_active && enable_color && is_ascii_line(s)) {
+    std::string vis_line = s.substr(start_col, end_col - start_col);
+    if (!visual_active && enable_color && is_ascii_line(vis_line)) {
       auto isWord = [](unsigned char c){ return std::isalnum(c) != 0 || c == '_'; };
       int cols = term.getSize().cols;
       int col = indent;
-      int n = (int)s.size();
+      int n = (int)vis_line.size();
       int p = 0;
       while (p < n) {
-        if (!isWord((unsigned char)s[p])) {
+        if (!isWord((unsigned char)vis_line[p])) {
           int start = p;
-          while (p < n && !isWord((unsigned char)s[p])) p++;
-          term.drawText(i, col, s.substr(start, p - start));
+          while (p < n && !isWord((unsigned char)vis_line[p])) p++;
+          term.drawText(i, col, vis_line.substr(start, p - start));
           col += (p - start);
         } else {
           int start = p;
-          while (p < n && isWord((unsigned char)s[p])) p++;
-          std::string tok = s.substr(start, p - start);
+          while (p < n && isWord((unsigned char)vis_line[p])) p++;
+          std::string tok = vis_line.substr(start, p - start);
           if (kwords_global.find(tok) != kwords_global.end()) {
             term.drawColored(i, col, tok, 1);
           } else {
@@ -140,8 +161,8 @@ void Renderer::render(ITerminal& term,
         if (col >= cols) break;
       }
     } else if (!visual_active) {
-      term.drawText(i, indent, s);
-      term.clearToEOL(i, indent + (int)s.size());
+      term.drawText(i, indent, vis_line);
+      term.clearToEOL(i, indent + (int)vis_line.size());
     }
   }
   std::string mode_str = (mode == Mode::Normal ? "NORMAL" : mode == Mode::Insert ? "INSERT" : mode == Mode::Command ? "COMMAND" : mode == Mode::Visual ? "VISUAL" : "VISUAL-LINE");
@@ -168,7 +189,9 @@ void Renderer::render(ITerminal& term,
     int want_col = cur.col;
     int line_len = (int)buf.line(cur.row).size();
     if (want_col > line_len) want_col = line_len;
-    term.moveCursor(screen_row, want_col + indent);
+    int screen_col = indent + std::max(0, want_col - std::max(0, vp.left_col));
+    screen_col = std::min(screen_col, cols - 1);
+    term.moveCursor(screen_row, screen_col);
   } else {
     term.moveCursor(rows - 1, 0);
   }
