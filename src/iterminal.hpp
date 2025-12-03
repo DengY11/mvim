@@ -14,10 +14,10 @@ public:
   virtual ~ITerminal() = default;
   virtual TermSize getSize() const = 0;
   virtual void clear() = 0;
-  virtual void drawText(int row, int col, const std::string& text) = 0;
-  virtual void drawHighlighted(int row, int col, const std::string& text, int hl_start, int hl_len) = 0;
-  virtual void drawColored(int row, int col, const std::string& text, int color_pair_id) = 0;
-  virtual void moveCursor(int row, int col) = 0;
+  virtual void draw_text(int row, int col, const std::string& text) = 0;
+  virtual void draw_highlighted(int row, int col, const std::string& text, int hl_start, int hl_len) = 0;
+  virtual void draw_colored(int row, int col, const std::string& text, int color_pair_id) = 0;
+  virtual void move_cursor(int row, int col) = 0;
   virtual void refresh() = 0;
-  virtual void clearToEOL(int row, int col) = 0;
+  virtual void clear_to_eol(int row, int col) = 0;
 };

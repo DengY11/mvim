@@ -20,12 +20,12 @@ struct UndoEntry {
 
 class UndoManager {
 public:
-  void beginGroup(const Cursor& pre);
-  void pushOp(const Operation& op);
-  void commitGroup(const Cursor& post);
+  void begin_group(const Cursor& pre);
+  void push_op(const Operation& op);
+  void commit_group(const Cursor& post);
   void clear_redo();
-  bool canUndo() const;
-  bool canRedo() const;
+  bool can_undo() const;
+  bool can_redo() const;
   void undo(TextBuffer& buf, Cursor& cur);
   void redo(TextBuffer& buf, Cursor& cur);
 

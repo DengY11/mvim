@@ -22,13 +22,13 @@ TermSize NcursesTerminal::getSize() const {
 
 void NcursesTerminal::clear() { erase(); }
 
-void NcursesTerminal::drawText(int row, int col, const std::string& text) {
+void NcursesTerminal::draw_text(int row, int col, const std::string& text) {
   if (has_colors()) attron(COLOR_PAIR(2));
   mvaddnstr(row, col, text.c_str(), (int)text.size());
   if (has_colors()) attroff(COLOR_PAIR(2));
 }
 
-void NcursesTerminal::drawHighlighted(int row, int col, const std::string& text, int hl_start, int hl_len) {
+void NcursesTerminal::draw_highlighted(int row, int col, const std::string& text, int hl_start, int hl_len) {
   int cols = getSize().cols;
   int len = (int)text.size();
   if (hl_start < 0) hl_start = 0;
@@ -63,13 +63,13 @@ void NcursesTerminal::drawHighlighted(int row, int col, const std::string& text,
   }
 }
 
-void NcursesTerminal::drawColored(int row, int col, const std::string& text, int color_pair_id) {
+void NcursesTerminal::draw_colored(int row, int col, const std::string& text, int color_pair_id) {
   if (has_colors()) attron(COLOR_PAIR(color_pair_id));
   mvaddnstr(row, col, text.c_str(), (int)text.size());
   if (has_colors()) attroff(COLOR_PAIR(color_pair_id));
 }
 
-void NcursesTerminal::moveCursor(int row, int col) { move(row, col); }
+void NcursesTerminal::move_cursor(int row, int col) { move(row, col); }
 
 void NcursesTerminal::refresh() { ::refresh(); }
 
@@ -83,7 +83,7 @@ void NcursesTerminal::setBackground(short color) {
   init_pair(1, COLOR_YELLOW, bg_color_);
   erase();
 }
-void NcursesTerminal::clearToEOL(int row, int col) {
+void NcursesTerminal::clear_to_eol(int row, int col) {
   move(row, col);
   clrtoeol();
 }

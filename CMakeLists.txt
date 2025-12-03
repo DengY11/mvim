@@ -24,7 +24,7 @@ add_executable(mvim
   src/text_buffer.cpp
   src/gap_buffer.cpp
   src/line_index.cpp
-  src/text_buffer_core.cpp
+  src/gap_text_buffer_core.cpp
   src/renderer.cpp
   src/input.cpp
   src/ncurses_terminal.cpp
@@ -50,7 +50,7 @@ add_executable(mvim_tests
   src/text_buffer.cpp
   src/gap_buffer.cpp
   src/line_index.cpp
-  src/text_buffer_core.cpp
+  src/gap_text_buffer_core.cpp
   src/file_reader.cpp
   tests/test_text_buffer.cpp
 )

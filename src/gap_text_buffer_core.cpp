@@ -1,14 +1,14 @@
-#include "text_buffer_core.hpp"
+#include "gap_text_buffer_core.hpp"
 
-void TextBufferCore::init_from_lines(const std::vector<std::string>& lines) {
+void GapTextBufferCore::init_from_lines(const std::vector<std::string>& lines) {
   gb.clear();
   gb.init_from_lines(lines);
   li.build_from_text(gb.buf, gb.gap_start, gb.gap_end);
 }
 
-int TextBufferCore::line_count() const { return (int)li.line_count(); }
+int GapTextBufferCore::line_count() const { return (int)li.line_count(); }
 
-std::string TextBufferCore::get_line(int r) const {
+std::string GapTextBufferCore::get_line(int r) const {
   if (r < 0) return std::string();
   size_t start = li.line_start((size_t)r);
   size_t end;
@@ -22,11 +22,11 @@ std::string TextBufferCore::get_line(int r) const {
   return gb.slice(start, len);
 }
 
-static inline void rebuild(TextBufferCore& c) {
+static inline void rebuild(GapTextBufferCore& c) {
   c.li.build_from_text(c.gb.buf, c.gb.gap_start, c.gb.gap_end);
 }
 
-void TextBufferCore::insert_line(int row, const std::string& s) {
+void GapTextBufferCore::insert_line(int row, const std::string& s) {
   int L = line_count();
   if (row < 0) row = 0; if (row > L) row = L;
   if (L == 0) {
@@ -49,7 +49,7 @@ void TextBufferCore::insert_line(int row, const std::string& s) {
   rebuild(*this);
 }
 
-void TextBufferCore::insert_lines(int row, const std::vector<std::string>& ss) {
+void GapTextBufferCore::insert_lines(int row, const std::vector<std::string>& ss) {
   if (ss.empty()) return;
   int L = line_count();
   if (row < 0) row = 0; if (row > L) row = L;
@@ -77,7 +77,7 @@ void TextBufferCore::insert_lines(int row, const std::vector<std::string>& ss) {
   rebuild(*this);
 }
 
-void TextBufferCore::erase_line(int row) {
+void GapTextBufferCore::erase_line(int row) {
   int L = line_count();
   if (row < 0 || row >= L) return;
   size_t start = li.line_start((size_t)row);
@@ -86,7 +86,7 @@ void TextBufferCore::erase_line(int row) {
   rebuild(*this);
 }
 
-void TextBufferCore::erase_lines(int start_row, int end_row) {
+void GapTextBufferCore::erase_lines(int start_row, int end_row) {
   int L = line_count();
   if (start_row < 0) start_row = 0;
   if (end_row < start_row) end_row = start_row;
@@ -98,7 +98,7 @@ void TextBufferCore::erase_lines(int start_row, int end_row) {
   rebuild(*this);
 }
 
-void TextBufferCore::replace_line(int row, const std::string& s) {
+void GapTextBufferCore::replace_line(int row, const std::string& s) {
   int L = line_count();
   if (row < 0 || row >= L) return;
   size_t start = li.line_start((size_t)row);

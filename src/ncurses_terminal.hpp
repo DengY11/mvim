@@ -14,12 +14,12 @@ public:
   ~NcursesTerminal();
   TermSize getSize() const override;
   void clear() override;
-  void drawText(int row, int col, const std::string& text) override;
-  void drawHighlighted(int row, int col, const std::string& text, int hl_start, int hl_len) override;
-  void drawColored(int row, int col, const std::string& text, int color_pair_id) override;
-  void moveCursor(int row, int col) override;
+  void draw_text(int row, int col, const std::string& text) override;
+  void draw_highlighted(int row, int col, const std::string& text, int hl_start, int hl_len) override;
+  void draw_colored(int row, int col, const std::string& text, int color_pair_id) override;
+  void move_cursor(int row, int col) override;
   void refresh() override;
-  void clearToEOL(int row, int col) override;
+  void clear_to_eol(int row, int col) override;
   void setBackground(short color);
 private:
   short bg_color_ = -1; // -1: default background

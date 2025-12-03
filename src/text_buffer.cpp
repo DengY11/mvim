@@ -53,7 +53,7 @@ TextBuffer TextBuffer::from_file(const std::filesystem::path& path, std::string&
   TextBuffer b;
   ok = true;
   std::vector<std::string> ls;
-  if (!mmapReadLines(path, ls, msg)) {
+  if (!mmap_readlines(path, ls, msg)) {
     ok = false;
     b.ensure_not_empty();
     return b;

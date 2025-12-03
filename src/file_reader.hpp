@@ -9,6 +9,6 @@
 #include <string>
 #include <filesystem>
 
-bool mmapReadLines(const std::filesystem::path& path,
+bool mmap_readlines(const std::filesystem::path& path,
                    std::vector<std::string>& out_lines,
                    std::string& msg);

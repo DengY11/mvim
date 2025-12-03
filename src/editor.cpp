@@ -161,9 +161,9 @@ void Editor::run() {
   }
 }
 
-void Editor::begin_group() { um.beginGroup(cur); }
-void Editor::commit_group() { um.commitGroup(cur); }
-void Editor::push_op(const Operation& op) { um.pushOp(op); }
+void Editor::begin_group() { um.begin_group(cur); }
+void Editor::commit_group() { um.commit_group(cur); }
+void Editor::push_op(const Operation& op) { um.push_op(op); }
 
 void Editor::render() { renderer.render(term, buf, cur, vp, mode, file_path, modified, message, cmdline, visual_active, visual_anchor, show_line_numbers, enable_color); }
 
@@ -450,7 +450,7 @@ void Editor::load_rc() {
   auto p = std::filesystem::path(home) / ".mvimrc";
   if (!std::filesystem::exists(p, ec)) return;
   std::vector<std::string> lines; std::string msg;
-  if (!mmapReadLines(p, lines, msg)) { message = msg; return; }
+  if (!mmap_readlines(p, lines, msg)) { message = msg; return; }
   for (std::string s : lines) {
     auto isspace_fn = [](unsigned char c){ return std::isspace(c) != 0; };
     size_t i = 0; while (i < s.size() && isspace_fn((unsigned char)s[i])) i++;

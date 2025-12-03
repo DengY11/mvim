@@ -6,7 +6,12 @@
 #include "gap_buffer.hpp"
 #include "line_index.hpp"
 
-class TextBufferCore : public ITextBufferCore {
+/*
+  this is the gap buffer backend
+  btw, it's not steady version, may cause problem
+  you can choose vector backend if you want a steady version
+*/
+class GapTextBufferCore : public ITextBufferCore {
 public:
   GapBuffer gb;
   LineIndex li;

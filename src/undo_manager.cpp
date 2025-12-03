@@ -1,6 +1,6 @@
 #include "undo_manager.hpp"
 
-void UndoManager::beginGroup(const Cursor& pre) {
+void UndoManager::begin_group(const Cursor& pre) {
   if (!grouping_) {
     grouping_ = true;
     current_.ops.clear();
@@ -8,13 +8,13 @@ void UndoManager::beginGroup(const Cursor& pre) {
   }
 }
 
-void UndoManager::pushOp(const Operation& op) {
+void UndoManager::push_op(const Operation& op) {
   if (grouping_) {
     current_.ops.push_back(op);
   }
 }
 
-void UndoManager::commitGroup(const Cursor& post) {
+void UndoManager::commit_group(const Cursor& post) {
   if (grouping_) {
     grouping_ = false;
     current_.post = post;
@@ -27,8 +27,8 @@ void UndoManager::commitGroup(const Cursor& post) {
 }
 
 void UndoManager::clear_redo() { redo_entries_.clear(); }
-bool UndoManager::canUndo() const { return !undo_entries_.empty(); }
-bool UndoManager::canRedo() const { return !redo_entries_.empty(); }
+bool UndoManager::can_undo() const { return !undo_entries_.empty(); }
+bool UndoManager::can_redo() const { return !redo_entries_.empty(); }
 
 void UndoManager::undo(TextBuffer& buf, Cursor& cur) {
   if (undo_entries_.empty()) return;
