@@ -25,6 +25,26 @@ static const std::unordered_set<std::string>& keywordsForExt(const std::string& 
   return def;
 }
 
+static void render_welcome_mvim(ITerminal& term, int rows, int cols, int indent){
+  const char* art[] = {
+    "MM   MM   V     V    I    MM   MM",
+    "M M M M    V   V     I    M M M M",
+    "M  M  M     V V      I    M  M  M",
+    "M     M      V     III    M     M"
+  };
+  int lines = 4;
+  int max_text_rows = std::max(0, rows - 1);
+  int text_cols = std::max(0, cols - indent);
+  int start_row = std::max(0, (max_text_rows - lines) / 2);
+  int max_len = 0;
+  for(int i=0;i<lines;i++){ int len = (int)std::strlen(art[i]); if(len>max_len) max_len = len; }
+  int start_col = indent + std::max(0, (text_cols - max_len) / 2);
+  for(int i=0;i<lines;i++){
+    term.draw_text(start_row + i, start_col, std::string(art[i]));
+    term.clear_to_eol(start_row + i, start_col + (int)std::strlen(art[i]));
+  }
+}
+
 void Renderer::render(ITerminal& term,
                       const TextBuffer& buf,
                       const Cursor& cur,
@@ -67,6 +87,10 @@ void Renderer::render(ITerminal& term,
     else if (cur.col >= vp.left_col + text_cols) vp.left_col = cur.col - text_cols + 1;
     if (vp.left_col < 0) vp.left_col = 0;
   }
+  bool show_welcome = (!file_path && buf.line_count() == 1 && buf.line(0).empty());
+  if (show_welcome) {
+    render_welcome_mvim(term, rows, cols, indent);
+  } else {
   for (int i = 0; i < max_text_rows; ++i) {
     int line_idx = vp.top_line + i;
     if (line_idx >= buf.line_count()) break;
@@ -164,6 +188,7 @@ void Renderer::render(ITerminal& term,
       term.draw_text(i, indent, vis_line);
       term.clear_to_eol(i, indent + (int)vis_line.size());
     }
+  }
   }
   std::string mode_str = (mode == Mode::Normal ? "NORMAL" : mode == Mode::Insert ? "INSERT" : mode == Mode::Command ? "COMMAND" : mode == Mode::Visual ? "VISUAL" : "VISUAL-LINE");
   std::ostringstream oss;
