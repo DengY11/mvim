@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cctype>
 #include "file_reader.hpp"
+#include "undo_manager.hpp"
 
 static constexpr int CTRL_u = 'U'-64; 
 static constexpr int CTRL_R = 'R'-64; 
@@ -217,7 +218,7 @@ void Editor::handle_normal_input(int ch) {
     case CTRL_R: redo(); break;
     case 'd':
       if (mode == Mode::Visual || mode == Mode::VisualLine) { delete_selection(); exit_visual(); }
-      else if (input.consumeDd('d')) { size_t n = input.takeCount(); if (n == 0) n = 1; begin_group(); delete_lines_range(cur.row, (int)n); commit_group(); }
+      else if (input.consumeDd('d')) { size_t n = input.takeCount(); if (n == 0) n = 1; begin_group(); delete_lines_range(cur.row, (int)n); commit_group();input.reset();pending_op = PendingOp::None; }
       else { pending_op = PendingOp::Delete; }
       break;
     case 'y':
