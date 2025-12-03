@@ -288,7 +288,7 @@ void Editor::handle_insert_input(int ch) {
   if (ch == ESC) { commit_group(); mode = Mode::Normal; return; }
   if (ch == KEY_BACKSPACE || ch == 127) { backspace(); return; }
   if (ch == '\t') {
-    auto& s = buf.line(cur.row);
+    std::string s = buf.line(cur.row);
     int n = std::max(1, tab_width);
     for (int i = 0; i < n; ++i) {
       s.insert(s.begin() + std::min(cur.col, (int)s.size()), ' ');
@@ -296,6 +296,7 @@ void Editor::handle_insert_input(int ch) {
       modified = true;
       cur.col++;
     }
+    buf.replace_line(cur.row, s);
     um.clear_redo();
     return;
   }
@@ -307,13 +308,14 @@ void Editor::handle_insert_input(int ch) {
   }
   if (ch == '\n' || ch == KEY_ENTER || ch == '\r') { split_line_at_cursor(); return; }
   if (ch >= 32 && ch <= 126) {
-    auto& s = buf.line(cur.row);
+    std::string s = buf.line(cur.row);
     if (cur.col < 0) cur.col = 0;
     if (cur.col > (int)s.size()) cur.col = (int)s.size();
     s.insert(s.begin() + cur.col, (char)ch);
     push_op({Operation::InsertChar, cur.row, cur.col, std::string(1, (char)ch), std::string()});
     modified = true;
     cur.col++;
+    buf.replace_line(cur.row, s);
     um.clear_redo();
     return;
   }
@@ -327,7 +329,7 @@ void Editor::insert_pair(int ch) {
     case '[': closing = ']'; break;
     default: return;
   }
-  auto& s = buf.line(cur.row);
+  std::string s = buf.line(cur.row);
   if (cur.col < 0) cur.col = 0;
   if (cur.col > (int)s.size()) cur.col = (int)s.size();
   s.insert(s.begin() + cur.col, (char)ch);
@@ -339,6 +341,7 @@ void Editor::insert_pair(int ch) {
     push_op({Operation::InsertChar, cur.row, cur.col, std::string(1, closing), std::string()});
     modified = true;
   }
+  buf.replace_line(cur.row, s);
   um.clear_redo();
 }
 
@@ -392,7 +395,7 @@ void Editor::delete_to_next_word() {
   reg.lines = { s.substr(c0, c1 - c0) };
   std::string neu = s.substr(0, c0) + s.substr(c1);
   push_op({Operation::ReplaceLine, old.row, c0, s, neu});
-  buf.line(old.row) = neu;
+  buf.replace_line(old.row, neu);
   cur.row = old.row; cur.col = c0;
   modified = true; um.clear_redo();
   commit_group();
@@ -422,7 +425,7 @@ void Editor::delete_to_word_end() {
   reg.lines = { s.substr(c0, c1 - c0) };
   std::string neu = s.substr(0, c0) + s.substr(c1);
   push_op({Operation::ReplaceLine, old.row, c0, s, neu});
-  buf.line(old.row) = neu;
+  buf.replace_line(old.row, neu);
   cur.row = old.row; cur.col = c0;
   modified = true; um.clear_redo();
   commit_group();
@@ -582,19 +585,19 @@ void Editor::delete_selection() {
     cur.col = 0;
   } else {
     if (r0 == r1) {
-      auto& s = buf.line(r0);
+      std::string s = buf.line(r0);
       c0 = std::clamp(c0, 0, (int)s.size());
       c1 = std::clamp(c1, 0, (int)s.size());
       if (c1 > c0) {
         std::string old = s;
         std::string neu = old.substr(0, c0) + old.substr(c1);
         push_op({Operation::ReplaceLine, r0, c0, old, neu});
-        s = neu;
+        buf.replace_line(r0, neu);
       }
       cur.row = r0; cur.col = c0;
     } else {
-      auto& first = buf.line(r0);
-      auto& last = buf.line(r1);
+      std::string first = buf.line(r0);
+      std::string last = buf.line(r1);
       c0 = std::clamp(c0, 0, (int)first.size());
       c1 = std::clamp(c1, 0, (int)last.size());
       std::string old_first = first;
@@ -610,7 +613,7 @@ void Editor::delete_selection() {
         }
         push_op({Operation::DeleteLinesBlock, r0 + 1, 0, mid, std::string()});
       }
-      first = neu_first;
+      buf.replace_line(r0, neu_first);
       buf.erase_lines(r0 + 1, r1 + 1);
       cur.row = r0; cur.col = (int)left.size();
     }
@@ -654,10 +657,11 @@ void Editor::move_up() { if (cur.row > 0) { cur.row--; cur.col = std::min(cur.co
 void Editor::move_down() { if (cur.row + 1 < buf.line_count()) { cur.row++; cur.col = std::min(cur.col, (int)buf.line(cur.row).size()); } }
 
 void Editor::delete_char() {
-  auto& s = buf.line(cur.row);
+  std::string s = buf.line(cur.row);
   if (cur.col < (int)s.size()) {
     char c = s[cur.col];
     s.erase(s.begin() + cur.col);
+    buf.replace_line(cur.row, s);
     push_op({Operation::DeleteChar, cur.row, cur.col, std::string(1, c), std::string()});
     modified = true; um.clear_redo();
   }
@@ -709,7 +713,7 @@ void Editor::paste_below() {
   } else {
     if (reg.lines.empty()) return;
     const std::string& text = reg.lines[0];
-    auto& s = buf.line(cur.row);
+    std::string s = buf.line(cur.row);
     int pos = std::min(cur.col + 1, (int)s.size());
     size_t start = 0;
     std::vector<std::string> parts;
@@ -722,11 +726,13 @@ void Editor::paste_below() {
     if (parts.size() == 1) {
       s.insert(pos, parts[0]);
       push_op({Operation::ReplaceLine, cur.row, pos, s.substr(0, pos), s});
+      buf.replace_line(cur.row, s);
       modified = true; um.clear_redo();
     } else {
       std::string left = s.substr(0, pos);
       std::string right = s.substr(pos);
       s = left + parts[0];
+      buf.replace_line(cur.row, s);
       {
         std::vector<std::string> tail(parts.begin() + 1, parts.end());
         buf.insert_lines(insert_row, tail);
@@ -735,8 +741,9 @@ void Editor::paste_below() {
       for (size_t i = 2; i < parts.size(); ++i) {
         push_op({Operation::InsertLine, insert_row + (int)i - 1, 0, parts[i], std::string()});
       }
-      auto& last = buf.line(insert_row + (int)parts.size() - 1);
+      std::string last = buf.line(insert_row + (int)parts.size() - 1);
       last += right;
+      buf.replace_line(insert_row + (int)parts.size() - 1, last);
       modified = true; um.clear_redo();
     }
     commit_group();
@@ -758,10 +765,10 @@ void Editor::insert_line_above() {
 }
 
 void Editor::split_line_at_cursor() {
-  auto& s = buf.line(cur.row);
+  std::string s = buf.line(cur.row);
   std::string left = s.substr(0, cur.col);
   std::string right = s.substr(cur.col);
-  s = left;
+  buf.replace_line(cur.row, left);
   buf.insert_line(cur.row + 1, right);
   push_op({Operation::InsertLine, cur.row + 1, 0, right, std::string()});
   cur.row++; cur.col = 0; modified = true; um.clear_redo();
@@ -769,9 +776,10 @@ void Editor::split_line_at_cursor() {
 
 void Editor::backspace() {
   if (cur.col > 0) {
-    auto& s = buf.line(cur.row);
+    std::string s = buf.line(cur.row);
     char c = s[cur.col - 1];
     s.erase(s.begin() + cur.col - 1);
+    buf.replace_line(cur.row, s);
     push_op({Operation::DeleteChar, cur.row, cur.col - 1, std::string(1, c), std::string()});
     cur.col--; modified = true; um.clear_redo();
   } else if (cur.row > 0) {
@@ -779,7 +787,7 @@ void Editor::backspace() {
     std::string curr = buf.line(cur.row);
     int old_row = cur.row;
     int old_col = prev.size();
-    buf.line(cur.row - 1) = prev + curr;
+    buf.replace_line(cur.row - 1, prev + curr);
     buf.erase_line(cur.row);
     push_op({Operation::ReplaceLine, old_row - 1, (int)prev.size(), prev, prev + curr});
     cur.row = old_row - 1; cur.col = old_col; modified = true; um.clear_redo();

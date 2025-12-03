@@ -7,6 +7,14 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Backend selection: USE_GAP=ON to use GapBuffer backend
+option(USE_GAP "Use GapBuffer backend for TextBuffer" OFF)
+if (USE_GAP)
+  add_compile_definitions(USE_GAP=1)
+else()
+  add_compile_definitions(USE_GAP=0)
+endif()
+
 find_package(Curses REQUIRED)
 include_directories(${CURSES_INCLUDE_DIR})
 
@@ -52,6 +60,7 @@ target_include_directories(mvim_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
 
 add_executable(mvim_bench
   src/text_buffer.cpp
+  src/gap_buffer.cpp
   src/file_reader.cpp
   tests/bench_large_delete.cpp
 )

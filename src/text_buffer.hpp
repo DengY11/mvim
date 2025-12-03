@@ -11,21 +11,25 @@
 #include <filesystem>
 #include "config.hpp"
 #if USE_GAP
-#include "text_buffer_core.hpp"
+#include "text_buffer_core.hpp" // Gap backend
+#else
+#include "vector_text_buffer_core.hpp" // Vector backend
 #endif
 
 class TextBuffer {
 public:
 #if USE_GAP
   TextBufferCore core;
+#else
+  VectorTextBufferCore core;
 #endif
-  std::vector<std::string> lines;
-
   bool empty() const;
   int line_count() const;
-  const std::string& line(int r) const;
-  std::string& line(int r);
+  std::string line(int r) const;
   void ensure_not_empty();
+
+  void init_from_lines(const std::vector<std::string>& lines);
+  void init_from_lines(std::vector<std::string>&& lines);
 
   void insert_line(int row, const std::string& s);
   void insert_lines(int row, const std::vector<std::string>& ss);

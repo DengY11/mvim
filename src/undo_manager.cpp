@@ -38,12 +38,18 @@ void UndoManager::undo(TextBuffer& buf, Cursor& cur) {
     const Operation& op = e.ops[i];
     switch (op.type) {
       case Operation::InsertChar: {
-        auto& s = buf.line(op.row);
-        if (op.col < (int)s.size()) s.erase(s.begin() + op.col);
+        std::string s = buf.line(op.row);
+        if (op.col < (int)s.size()) {
+          s.erase(s.begin() + op.col);
+          buf.replace_line(op.row, s);
+        }
       } break;
       case Operation::DeleteChar: {
-        auto& s = buf.line(op.row);
-        if (op.col <= (int)s.size()) s.insert(s.begin() + op.col, op.payload[0]);
+        std::string s = buf.line(op.row);
+        if (op.col <= (int)s.size()) {
+          s.insert(s.begin() + op.col, op.payload[0]);
+          buf.replace_line(op.row, s);
+        }
       } break;
       case Operation::InsertLine: {
         if (op.row < buf.line_count()) buf.erase_line(op.row);
@@ -52,7 +58,7 @@ void UndoManager::undo(TextBuffer& buf, Cursor& cur) {
         buf.insert_line(op.row, op.payload);
       } break;
       case Operation::ReplaceLine: {
-        if (op.row >= 0 && op.row < buf.line_count()) buf.line(op.row) = op.payload;
+        if (op.row >= 0 && op.row < buf.line_count()) buf.replace_line(op.row, op.payload);
       } break;
       case Operation::InsertLinesBlock: {
         int start = op.row;
@@ -86,12 +92,18 @@ void UndoManager::redo(TextBuffer& buf, Cursor& cur) {
     const Operation& op = e.ops[i];
     switch (op.type) {
       case Operation::InsertChar: {
-        auto& s = buf.line(op.row);
-        if (op.col <= (int)s.size()) s.insert(s.begin() + op.col, op.payload[0]);
+        std::string s = buf.line(op.row);
+        if (op.col <= (int)s.size()) {
+          s.insert(s.begin() + op.col, op.payload[0]);
+          buf.replace_line(op.row, s);
+        }
       } break;
       case Operation::DeleteChar: {
-        auto& s = buf.line(op.row);
-        if (op.col < (int)s.size()) s.erase(s.begin() + op.col);
+        std::string s = buf.line(op.row);
+        if (op.col < (int)s.size()) {
+          s.erase(s.begin() + op.col);
+          buf.replace_line(op.row, s);
+        }
       } break;
       case Operation::InsertLine: {
         buf.insert_line(op.row, op.payload);
@@ -100,7 +112,7 @@ void UndoManager::redo(TextBuffer& buf, Cursor& cur) {
         if (op.row < buf.line_count()) buf.erase_line(op.row);
       } break;
       case Operation::ReplaceLine: {
-        if (op.row >= 0 && op.row < buf.line_count()) buf.line(op.row) = op.alt_payload;
+        if (op.row >= 0 && op.row < buf.line_count()) buf.replace_line(op.row, op.alt_payload);
       } break;
       case Operation::InsertLinesBlock: {
         int start = op.row;
