@@ -5,7 +5,7 @@
 
 int main() {
   TextBuffer b;
-  b.lines = {"a", "b", "c"};
+  b.init_from_lines({"a", "b", "c"});
   assert(b.line_count() == 3);
   b.insert_line(1, "x");
   assert(b.line_count() == 4);
