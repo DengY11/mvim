@@ -94,21 +94,60 @@ bool TextBuffer::write_file(const std::filesystem::path& path, std::string& msg)
     return false;
   }
   std::string out;
-  {
-    int n = line_count();
+  int n = line_count();
+  if (n <= 0) {
+    out = std::string();
+  } else {
+    std::vector<size_t> lens(static_cast<size_t>(n));
+    unsigned hw = std::thread::hardware_concurrency(); if (hw == 0) hw = 4;
+    if (n >= 1024 && hw > 1) {
+      unsigned t = std::min<unsigned>(hw, static_cast<unsigned>(n / 1024)); t = std::max(t, 2u);
+      size_t per = (static_cast<size_t>(n) + t - 1) / t;
+      std::vector<std::future<void>> futs;
+      for (unsigned k = 0; k < t; ++k) {
+        size_t i0 = k * per; size_t i1 = std::min(static_cast<size_t>(n), (k + 1) * per);
+        if (i0 >= i1) break;
+        futs.emplace_back(std::async(std::launch::async, [&, i0, i1]{
+          for (size_t i = i0; i < i1; ++i) lens[i] = line(static_cast<int>(i)).size();
+        }));
+      }
+      for (auto& f : futs) f.get();
+    } else {
+      for (int i = 0; i < n; ++i) lens[static_cast<size_t>(i)] = line(i).size();
+    }
+    std::vector<size_t> pos(static_cast<size_t>(n));
     size_t total = 0;
     for (int i = 0; i < n; ++i) {
-      total += line(i).size();
+      pos[static_cast<size_t>(i)] = total;
+      total += lens[static_cast<size_t>(i)];
+      if (i + 1 < n) total += 1; // newline
     }
-    if (n > 1) {
-      total += static_cast<size_t>(n - 1);
-    }
-    out.reserve(total);
-    for (int i = 0; i < n; ++i) {
-      std::string s = line(i);
-      out.append(s);
-      if (i + 1 < n) {
-        out.push_back('\n');
+    out.resize(total);
+    char* out_data = out.data();
+    // 并行拷贝内容
+    if (n >= 1024 && hw > 1) {
+      unsigned t = std::min<unsigned>(hw, static_cast<unsigned>(n / 1024)); t = std::max(t, 2u);
+      size_t per = (static_cast<size_t>(n) + t - 1) / t;
+      std::vector<std::future<void>> futs;
+      for (unsigned k = 0; k < t; ++k) {
+        size_t i0 = k * per; size_t i1 = std::min(static_cast<size_t>(n), (k + 1) * per);
+        if (i0 >= i1) break;
+        futs.emplace_back(std::async(std::launch::async, [&, i0, i1]{
+          for (size_t i = i0; i < i1; ++i) {
+            std::string s = line(static_cast<int>(i));
+            size_t p = pos[i];
+            std::memcpy(out_data + p, s.data(), s.size());
+            if (i + 1 < static_cast<size_t>(n)) out_data[p + s.size()] = '\n';
+          }
+        }));
+      }
+      for (auto& f : futs) f.get();
+    } else {
+      for (int i = 0; i < n; ++i) {
+        std::string s = line(i);
+        size_t p0 = pos[static_cast<size_t>(i)];
+        std::memcpy(out_data + p0, s.data(), s.size());
+        if (i + 1 < n) out_data[p0 + s.size()] = '\n';
       }
     }
   }
