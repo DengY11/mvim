@@ -12,7 +12,7 @@
 
 ### 性能与大文件
 - 读取实现基于 POSIX `mmap`，并结合 `madvise(MADV_SEQUENTIAL)` 做顺序预读，以降低系统调用与缺页开销。
-- 在我的 macOS 环境下，针对 100MB 文本的响应时间相较 Vim 更小（结果因平台与配置而异，仅供参考）。
+- 编辑核心提供了rope tree\vector\gap buffer三种后端，你可以在`config.hpp`中选择。目前rope tree在大部分场景性能最好，一些场景不如vector, gap buffer已经废弃了，不建议使用。vector经过我的广泛测试，rope tree还没有经过广泛验证
 
 生成测试文件：
 ```bash
@@ -28,7 +28,7 @@ python3 generate_large_file.py 100 large_test_file.txt  # 生成约 100MB 的文
 
 ### Performance & Large Files
 - File reading uses POSIX `mmap` plus `madvise(MADV_SEQUENTIAL)` to improve sequential prefetch and reduce syscall/page faults.
-- On my macOS machine, opening a 100MB text shows a smaller response time than Vim (results vary across platforms/configs).
+- The editor core provides three backends: rope tree, vector, and gap buffer. You can choose the backend in `config.hpp`. Currently, rope tree performs best in most scenarios, while vector has been extensively tested. Gap buffer is deprecated and not recommended.
 
 Generate a test file:
 ```bash
