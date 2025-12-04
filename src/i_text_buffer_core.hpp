@@ -4,25 +4,26 @@
 #include <string_view>
 #include <span>
 
-/*
-  currently we have rope, gap buffer backend and vector backend
-  but gap buffer seems to be slower than vector backend
-  rope is faster than gap buffer, but not widely tested
-*/
-class ITextBufferCore {
+template <typename Derived>
+class TextBufferCoreCRTP {
 public:
-  virtual ~ITextBufferCore() = default;
-  virtual void init_from_lines(const std::vector<std::string>& lines) = 0;
-  virtual int line_count() const = 0;
-  virtual std::string get_line(int r) const = 0;
-  virtual std::string_view get_name() const = 0;
+  std::string_view get_name() const { return as_const_derived().get_name_sv(); }
+  void init_from_lines(const std::vector<std::string>& lines) { as_derived().do_init_from_lines(lines); }
+  int line_count() const { return as_const_derived().do_line_count(); }
+  std::string get_line(int r) const { return as_const_derived().do_get_line(r); }
+  /*insert*/
+  void insert_line(size_t row, const std::string& s) { as_derived().do_insert_line(row, s); }
+  void insert_line(size_t row, std::string_view s) { as_derived().do_insert_line(row, s); }
+  void insert_lines(size_t row, const std::vector<std::string>& ss) { as_derived().do_insert_lines(row, ss); }
+  void insert_lines(size_t row, std::span<const std::string> ss) { as_derived().do_insert_lines(row, ss); }
+  /*erase*/
+  void erase_line(size_t row) { as_derived().do_erase_line(row); }
+  void erase_lines(size_t start_row, size_t end_row) { as_derived().do_erase_lines(start_row, end_row); }
+  /*replace*/
+  void replace_line(size_t row, const std::string& s) { as_derived().do_replace_line(row, s); }
+  void replace_line(size_t row, std::string_view s) { as_derived().do_replace_line(row, s); }
 
-  virtual void insert_line(size_t row, const std::string& s) = 0;
-  virtual void insert_line(size_t row, std::string_view s) = 0;
-  virtual void insert_lines(size_t row, const std::vector<std::string>& ss) = 0;
-  virtual void insert_lines(size_t row, std::span<const std::string> ss) = 0;
-  virtual void erase_line(size_t row) = 0;
-  virtual void erase_lines(size_t start_row, size_t end_row) = 0; // end_row exclusive
-  virtual void replace_line(size_t row, const std::string& s) = 0;
-  virtual void replace_line(size_t row, std::string_view s) = 0;
+private:
+  Derived& as_derived() { return static_cast<Derived&>(*this); }
+  const Derived& as_const_derived() const { return static_cast<const Derived&>(*this); }
 };

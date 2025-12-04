@@ -12,11 +12,26 @@
 #include <memory>
 #include <string>
 #include "i_text_buffer_core.hpp"
+#include "config.hpp"
+#if TB_BACKEND == TB_BACKEND_GAP
+#include "gap_text_buffer_core.hpp"
+#elif TB_BACKEND == TB_BACKEND_ROPE
+#include "rope_text_buffer_core.hpp"
+#else
+#include "vector_text_buffer_core.hpp"
+#endif
 
 class TextBuffer {
 public:
   TextBuffer();
-  std::unique_ptr<ITextBufferCore> core;
+  // 使用编译期选择的具体后端类型（CRTP 非虚调用）
+#if TB_BACKEND == TB_BACKEND_GAP
+  GapTextBufferCore core;
+#elif TB_BACKEND == TB_BACKEND_ROPE
+  RopeTextBufferCore core;
+#else
+  VectorTextBufferCore core;
+#endif
 
   std::string_view backend_name() const;
   bool empty() const;

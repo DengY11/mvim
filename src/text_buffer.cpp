@@ -7,68 +7,53 @@
 #include "file_reader.hpp"
 #include "config.hpp"
 #include "config.hpp"
-#if TB_BACKEND == TB_BACKEND_GAP
-#include "gap_text_buffer_core.hpp"
-#elif TB_BACKEND == TB_BACKEND_ROPE
-#include "rope_text_buffer_core.hpp"
-#else
-#include "vector_text_buffer_core.hpp"
-#endif
 
-TextBuffer::TextBuffer() {
-#if TB_BACKEND == TB_BACKEND_GAP
-  core = std::make_unique<GapTextBufferCore>();
-#elif TB_BACKEND == TB_BACKEND_ROPE
-  core = std::make_unique<RopeTextBufferCore>();
-#else
-  core = std::make_unique<VectorTextBufferCore>();
-#endif
-}
+TextBuffer::TextBuffer() {}
 
 std::string_view TextBuffer::backend_name() const {
-  return core->get_name();
+  return core.get_name();
 }
 
 bool TextBuffer::empty() const { return line_count() == 0; }
-int TextBuffer::line_count() const { return core->line_count(); }
-std::string TextBuffer::line(int r) const { return core->get_line(r); }
+int TextBuffer::line_count() const { return core.line_count(); }
+std::string TextBuffer::line(int r) const { return core.get_line(r); }
 
 void TextBuffer::ensure_not_empty() {
-  if (line_count() == 0) core->insert_line(static_cast<size_t>(0), std::string());
+  if (line_count() == 0) core.insert_line(static_cast<size_t>(0), std::string());
 }
 
 void TextBuffer::init_from_lines(const std::vector<std::string>& src) {
-  core->init_from_lines(src);
+  core.init_from_lines(src);
   ensure_not_empty();
 }
 
 void TextBuffer::init_from_lines(std::vector<std::string>&& src) {
-  core->init_from_lines(src);
+  core.init_from_lines(src);
   ensure_not_empty();
 }
 
 void TextBuffer::insert_line(int row, const std::string& s) {
-  core->insert_line(static_cast<size_t>(row), s);
+  core.insert_line(static_cast<size_t>(row), s);
 }
 
 
 void TextBuffer::insert_lines(int row, const std::vector<std::string>& ss) {
-  core->insert_lines(static_cast<size_t>(row), ss);
+  core.insert_lines(static_cast<size_t>(row), ss);
 }
 
 
 void TextBuffer::erase_line(int row) {
-  core->erase_line(static_cast<size_t>(row));
+  core.erase_line(static_cast<size_t>(row));
   ensure_not_empty();
 }
 
 void TextBuffer::erase_lines(int start_row, int end_row) {
-  core->erase_lines(static_cast<size_t>(start_row), static_cast<size_t>(end_row));
+  core.erase_lines(static_cast<size_t>(start_row), static_cast<size_t>(end_row));
   ensure_not_empty();
 }
 
 void TextBuffer::replace_line(int row, const std::string& s) {
-  core->replace_line(static_cast<size_t>(row), s);
+  core.replace_line(static_cast<size_t>(row), s);
 }
 
 
