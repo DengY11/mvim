@@ -149,6 +149,11 @@ Editor::Editor(const std::optional<std::filesystem::path>& file)
     term.setBackground(col);
     message = std::string("background=") + v;
   });
+  registry.register_command("backend", [this](const std::vector<std::string>& args){
+    (void)args;
+    message = "backend=";
+    message += buf.backend_name();
+  });
 
   load_rc();
 }

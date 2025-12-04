@@ -7,6 +7,8 @@
 
 class VectorTextBufferCore : public ITextBufferCore {
 public:
+  std::string_view get_name() const override { return "vector"; }
+
   void init_from_lines(const std::vector<std::string>& lines) override { lines_ = lines; }
   int line_count() const override { return static_cast<int>(lines_.size()); }
   std::string get_line(int r) const override { if (r < 0 || r >= static_cast<int>(lines_.size())) return std::string(); return lines_[r]; }

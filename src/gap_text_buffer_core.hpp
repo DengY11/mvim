@@ -17,6 +17,7 @@ class GapTextBufferCore : public ITextBufferCore {
 public:
   GapBuffer gb;
   LineIndex li;
+  std::string_view get_name() const override { return "gap"; }
 
   void init_from_lines(const std::vector<std::string>& lines) override;
   int line_count() const override;

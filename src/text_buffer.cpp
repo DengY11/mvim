@@ -2,22 +2,31 @@
 #include <fstream>
 #include <unistd.h>
 #include <fcntl.h>
+#include "posix_fd.hpp"
 #include <sys/stat.h>
 #include "file_reader.hpp"
 #include "config.hpp"
-#include "posix_fd.hpp"
-#if USE_GAP
+#include "config.hpp"
+#if TB_BACKEND == TB_BACKEND_GAP
 #include "gap_text_buffer_core.hpp"
+#elif TB_BACKEND == TB_BACKEND_ROPE
+#include "rope_text_buffer_core.hpp"
 #else
 #include "vector_text_buffer_core.hpp"
 #endif
 
 TextBuffer::TextBuffer() {
-#if USE_GAP
+#if TB_BACKEND == TB_BACKEND_GAP
   core = std::make_unique<GapTextBufferCore>();
+#elif TB_BACKEND == TB_BACKEND_ROPE
+  core = std::make_unique<RopeTextBufferCore>();
 #else
   core = std::make_unique<VectorTextBufferCore>();
 #endif
+}
+
+std::string_view TextBuffer::backend_name() const {
+  return core->get_name();
 }
 
 bool TextBuffer::empty() const { return line_count() == 0; }

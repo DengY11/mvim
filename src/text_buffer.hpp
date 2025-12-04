@@ -10,12 +10,15 @@
 #include <vector>
 #include <filesystem>
 #include <memory>
+#include <string>
 #include "i_text_buffer_core.hpp"
 
 class TextBuffer {
 public:
   TextBuffer();
   std::unique_ptr<ITextBufferCore> core;
+
+  std::string_view backend_name() const;
   bool empty() const;
   int line_count() const;
   std::string line(int r) const;
