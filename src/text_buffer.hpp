@@ -24,7 +24,6 @@
 class TextBuffer {
 public:
   TextBuffer();
-  // 使用编译期选择的具体后端类型（CRTP 非虚调用）
 #if TB_BACKEND == TB_BACKEND_GAP
   GapTextBufferCore core;
 #elif TB_BACKEND == TB_BACKEND_ROPE

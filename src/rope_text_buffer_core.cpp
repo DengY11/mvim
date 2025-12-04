@@ -7,6 +7,45 @@ void RopeTextBufferCore::recalc(Node* n) {
   size_t r = count_lines(n->right.get());
   size_t self = n->lines.size();
   n->lines_count = l + r + self;
+  n->height = 1 + std::max(node_height(n->left.get()), node_height(n->right.get()));
+}
+
+std::unique_ptr<RopeTextBufferCore::Node> RopeTextBufferCore::rotate_left(std::unique_ptr<Node> x) {
+  auto y = std::move(x->right);
+  auto T2 = std::move(y->left);
+  y->left = std::move(x);
+  y->left->right = std::move(T2);
+  recalc(y->left.get());
+  recalc(y.get());
+  return y;
+}
+
+std::unique_ptr<RopeTextBufferCore::Node> RopeTextBufferCore::rotate_right(std::unique_ptr<Node> y) {
+  auto x = std::move(y->left);
+  auto T2 = std::move(x->right);
+  x->right = std::move(y);
+  x->right->left = std::move(T2);
+  recalc(x->right.get());
+  recalc(x.get());
+  return x;
+}
+
+std::unique_ptr<RopeTextBufferCore::Node> RopeTextBufferCore::balance(std::unique_ptr<Node> n) {
+  if (!n) return n;
+  recalc(n.get());
+  int bf = balance_factor(n.get());
+  if (bf > 1) { // left heavy
+    if (balance_factor(n->left.get()) < 0) {
+      n->left = rotate_left(std::move(n->left));
+    }
+    return rotate_right(std::move(n));
+  } else if (bf < -1) { // right heavy
+    if (balance_factor(n->right.get()) > 0) {
+      n->right = rotate_right(std::move(n->right));
+    }
+    return rotate_left(std::move(n));
+  }
+  return n;
 }
 
 std::unique_ptr<RopeTextBufferCore::Node> RopeTextBufferCore::make_leaf(std::vector<std::string>&& lines) {
@@ -23,7 +62,7 @@ std::unique_ptr<RopeTextBufferCore::Node> RopeTextBufferCore::concat(std::unique
   p->left = std::move(a);
   p->right = std::move(b);
   recalc(p.get());
-  return p;
+  return balance(std::move(p));
 }
 
 std::pair<std::unique_ptr<RopeTextBufferCore::Node>, std::unique_ptr<RopeTextBufferCore::Node>>
@@ -34,7 +73,7 @@ RopeTextBufferCore::split(std::unique_ptr<Node> n, size_t k) {
     auto [a, b] = split(std::move(n->left), k);
     n->left = std::move(b);
     recalc(n.get());
-    return {std::move(a), std::move(n)};
+    return {std::move(a), balance(std::move(n))};
   }
   k -= left_count;
   size_t self_count = n->lines.size();
@@ -51,13 +90,13 @@ RopeTextBufferCore::split(std::unique_ptr<Node> n, size_t k) {
     rest->right = std::move(n->right);
     rest->left = make_leaf(std::move(right_lines));
     recalc(rest.get());
-    return {std::move(a), std::move(rest)};
+    return {std::move(a), balance(std::move(rest))};
   }
   k -= self_count;
   auto [a, b] = split(std::move(n->right), k);
   n->right = std::move(a);
   recalc(n.get());
-  return {std::move(n), std::move(b)};
+  return {balance(std::move(n)), std::move(b)};
 }
 
 std::unique_ptr<RopeTextBufferCore::Node>

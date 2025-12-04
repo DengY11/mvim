@@ -40,13 +40,20 @@ private:
   struct Node {
     std::unique_ptr<Node> left;
     std::unique_ptr<Node> right;
-    std::vector<std::string> lines; // non-empty only for leaves
-    size_t lines_count = 0;         // aggregated number of lines
+    std::vector<std::string> lines; /* non-empty only for leaves */
+    size_t lines_count = 0;         /* aggregated number of lines */
+    int height = 1;                 /* AVL height */
   };
   std::unique_ptr<Node> root_;
 
   static size_t count_lines(const Node* n) { return n ? n->lines_count : 0; }
+  static int node_height(const Node* n) { return n ? n->height : 0; }
+  static int balance_factor(const Node* n) { return n ? (node_height(n->left.get()) - node_height(n->right.get())) : 0; }
   static void recalc(Node* n);
+  static std::unique_ptr<Node> rotate_left(std::unique_ptr<Node> x);
+  static std::unique_ptr<Node> rotate_right(std::unique_ptr<Node> y);
+  static std::unique_ptr<Node> balance(std::unique_ptr<Node> n);
+
   static std::unique_ptr<Node> make_leaf(std::vector<std::string>&& lines);
   static std::unique_ptr<Node> concat(std::unique_ptr<Node> a, std::unique_ptr<Node> b);
   static std::pair<std::unique_ptr<Node>, std::unique_ptr<Node>> split(std::unique_ptr<Node> n, size_t k);
