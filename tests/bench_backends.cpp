@@ -10,12 +10,12 @@
 #include <random>
 
 struct BenchCfg {
-  int N = 200000;               // 初始行数
-  int get_iters = 200000;       // get_line 次数
-  int insert_iters = 10000;     // insert_line 次数（头/中/尾各）
-  int erase_iters = 10000;      // erase_line 次数（头/中/尾各）
-  int block_size = 100;         // 批量插入/删除的块大小
-  int block_iters = 500;        // 批量插入/删除迭代次数（头/中/尾各）
+  int N = 200000;               /*init lines count*/
+  int get_iters = 200000;       /*get_line iters*/ 
+  int insert_iters = 10000;     /*insert_line iters (head/mid/tail)*/
+  int erase_iters = 10000;      /*erase_line iters (head/mid/tail)*/
+  int block_size = 100;         /*batch insert/erase block size*/
+  int block_iters = 500;        /*batch insert/erase iters (head/mid/tail)*/
 };
 
 static std::vector<std::string> make_lines(int n) {
