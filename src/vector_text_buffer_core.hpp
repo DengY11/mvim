@@ -7,7 +7,7 @@
 
 class VectorTextBufferCore : public TextBufferCoreCRTP<VectorTextBufferCore> {
 public:
-  std::string_view get_name_sv() const { return "vector"; }
+  static constexpr std::string_view get_name_sv() { return "vector"; }
 
   void init_from_lines(const std::vector<std::string>& lines) { lines_ = lines; }
   int line_count() const { return static_cast<int>(lines_.size()); }

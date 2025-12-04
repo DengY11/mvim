@@ -17,7 +17,7 @@ class GapTextBufferCore : public TextBufferCoreCRTP<GapTextBufferCore> {
 public:
   GapBuffer gb;
   LineIndex li;
-  std::string_view get_name_sv() const { return "gap"; }
+  static constexpr std::string_view get_name_sv() { return "gap"; }
 
   void init_from_lines(const std::vector<std::string>& lines);
   int line_count() const;

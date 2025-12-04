@@ -9,7 +9,7 @@
 
 class RopeTextBufferCore : public TextBufferCoreCRTP<RopeTextBufferCore> {
 public:
-  std::string_view get_name_sv() const { return "rope"; }
+  static constexpr std::string_view get_name_sv() { return "rope"; }
   void init_from_lines(const std::vector<std::string>& lines);
   int line_count() const;
   std::string get_line(int r) const;
