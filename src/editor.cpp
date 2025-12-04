@@ -23,42 +23,42 @@ static inline bool is_symble(unsigned char c) {
   return !is_space(c) && !is_word(c);
 }
 static int next_word_start_same_line(const std::string& line, int col) {
-  int len = (int)line.size();
+  int len = static_cast<int>(line.size());
   if (col < 0) col = 0; if (col > len) col = len;
   if (col >= len) return len;
-  unsigned char c = (unsigned char)line[col];
+  unsigned char c = static_cast<unsigned char>(line[col]);
   if (is_space(c)) {
-    while (col < len && is_space((unsigned char)line[col])) col++;
+    while (col < len && is_space(static_cast<unsigned char>(line[col]))) col++;
     return col;
   }
   if (is_word(c) || is_num(c)) {
-    while (col + 1 < len && (is_word((unsigned char)line[col + 1]) || is_num((unsigned char)line[col + 1]))) col++;
+    while (col + 1 < len && (is_word(static_cast<unsigned char>(line[col + 1])) || is_num(static_cast<unsigned char>(line[col + 1])))) col++;
     return std::min(len, col + 1);
   }
-  while (col + 1 < len && is_symble((unsigned char)line[col + 1])) col++;
+  while (col + 1 < len && is_symble(static_cast<unsigned char>(line[col + 1]))) col++;
   return std::min(len, col + 1);
 }
 static int next_word_end_same_line(const std::string& line, int col) {
-  int len = (int)line.size();
+  int len = static_cast<int>(line.size());
   if (col < 0) col = 0; if (col > len) col = len;
   if (col >= len) return len;
-  unsigned char c = (unsigned char)line[col];
+  unsigned char c = static_cast<unsigned char>(line[col]);
   if (is_space(c)) {
-    while (col < len && is_space((unsigned char)line[col])) col++;
+    while (col < len && is_space(static_cast<unsigned char>(line[col]))) col++;
     if (col >= len) return len;
-    unsigned char c2 = (unsigned char)line[col];
+    unsigned char c2 = static_cast<unsigned char>(line[col]);
     if (is_word(c2) || is_num(c2)) {
-      while (col + 1 < len && (is_word((unsigned char)line[col + 1]) || is_num((unsigned char)line[col + 1]))) col++;
+      while (col + 1 < len && (is_word(static_cast<unsigned char>(line[col + 1])) || is_num(static_cast<unsigned char>(line[col + 1])))) col++;
       return std::min(len, col + 1);
     }
-    while (col + 1 < len && is_symble((unsigned char)line[col + 1])) col++;
+    while (col + 1 < len && is_symble(static_cast<unsigned char>(line[col + 1]))) col++;
     return std::min(len, col + 1);
   }
   if (is_word(c) || is_num(c)) {
-    while (col + 1 < len && (is_word((unsigned char)line[col + 1]) || is_num((unsigned char)line[col + 1]))) col++;
+    while (col + 1 < len && (is_word(static_cast<unsigned char>(line[col + 1])) || is_num(static_cast<unsigned char>(line[col + 1])))) col++;
     return std::min(len, col + 1);
   }
-  while (col + 1 < len && is_symble((unsigned char)line[col + 1])) col++;
+  while (col + 1 < len && is_symble(static_cast<unsigned char>(line[col + 1]))) col++;
   return std::min(len, col + 1);
 }
 Editor::Editor(const std::optional<std::filesystem::path>& file)
@@ -133,7 +133,7 @@ Editor::Editor(const std::optional<std::filesystem::path>& file)
   });
   registry.register_command("set background", [this](const std::vector<std::string>& args){
     if (args.empty()) { message = "set background: use :set background default|black|white|green|yellow"; return; }
-    auto to_lower = [](std::string s){ for (auto& c: s) c = (char)std::tolower((unsigned char)c); return s; };
+    auto to_lower = [](std::string s){ for (auto& c: s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c))); return s; };
     std::string v = to_lower(args[0]);
     short col = -1;
     if (v == "default" || v == "normal") col = -1;
@@ -311,9 +311,9 @@ void Editor::handle_insert_input(int ch) {
   if (ch >= 32 && ch <= 126) {
     std::string s = buf.line(cur.row);
     if (cur.col < 0) cur.col = 0;
-    if (cur.col > (int)s.size()) cur.col = (int)s.size();
-    s.insert(s.begin() + cur.col, (char)ch);
-    push_op({Operation::InsertChar, cur.row, cur.col, std::string(1, (char)ch), std::string()});
+    if (cur.col > static_cast<int>(s.size())) cur.col = static_cast<int>(s.size());
+    s.insert(s.begin() + cur.col, static_cast<char>(ch));
+    push_op({Operation::InsertChar, cur.row, cur.col, std::string(1, static_cast<char>(ch)), std::string()});
     modified = true;
     cur.col++;
     buf.replace_line(cur.row, s);

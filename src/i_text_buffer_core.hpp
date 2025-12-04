@@ -1,6 +1,8 @@
 #pragma once
 #include <string>
 #include <vector>
+#include <string_view>
+#include <span>
 
 class ITextBufferCore {
 public:
@@ -9,9 +11,12 @@ public:
   virtual int line_count() const = 0;
   virtual std::string get_line(int r) const = 0;
 
-  virtual void insert_line(int row, const std::string& s) = 0;
-  virtual void insert_lines(int row, const std::vector<std::string>& ss) = 0;
-  virtual void erase_line(int row) = 0;
-  virtual void erase_lines(int start_row, int end_row) = 0; // end_row exclusive
-  virtual void replace_line(int row, const std::string& s) = 0;
+  virtual void insert_line(size_t row, const std::string& s) = 0;
+  virtual void insert_line(size_t row, std::string_view s) = 0;
+  virtual void insert_lines(size_t row, const std::vector<std::string>& ss) = 0;
+  virtual void insert_lines(size_t row, std::span<const std::string> ss) = 0;
+  virtual void erase_line(size_t row) = 0;
+  virtual void erase_lines(size_t start_row, size_t end_row) = 0; // end_row exclusive
+  virtual void replace_line(size_t row, const std::string& s) = 0;
+  virtual void replace_line(size_t row, std::string_view s) = 0;
 };

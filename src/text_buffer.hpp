@@ -9,20 +9,13 @@
 #include <string>
 #include <vector>
 #include <filesystem>
-#include "config.hpp"
-#if USE_GAP
-#include "text_buffer_core.hpp" // Gap backend
-#else
-#include "vector_text_buffer_core.hpp" // Vector backend
-#endif
+#include <memory>
+#include "i_text_buffer_core.hpp"
 
 class TextBuffer {
 public:
-#if USE_GAP
-  TextBufferCore core;
-#else
-  VectorTextBufferCore core;
-#endif
+  TextBuffer();
+  std::unique_ptr<ITextBufferCore> core;
   bool empty() const;
   int line_count() const;
   std::string line(int r) const;

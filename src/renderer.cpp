@@ -5,7 +5,7 @@
 #include <string>
 #include <algorithm>
 
-static std::string toLower(std::string s){ for(char& c: s) c = (char)std::tolower((unsigned char)c); return s; }
+static std::string toLower(std::string s){ for(char& c: s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c))); return s; }
 static const std::unordered_set<std::string>& keywordsForExt(const std::string& ext){
   static const std::unordered_set<std::string> def = {"if","else","for","while","return","true","false","null"};
   static const std::unordered_set<std::string> cxx = {
@@ -37,11 +37,11 @@ static void render_welcome_mvim(ITerminal& term, int rows, int cols, int indent)
   int text_cols = std::max(0, cols - indent);
   int start_row = std::max(0, (max_text_rows - lines) / 2);
   int max_len = 0;
-  for(int i=0;i<lines;i++){ int len = (int)std::strlen(art[i]); if(len>max_len) max_len = len; }
+  for(int i=0;i<lines;i++){ int len = static_cast<int>(std::strlen(art[i])); if(len>max_len) max_len = len; }
   int start_col = indent + std::max(0, (text_cols - max_len) / 2);
   for(int i=0;i<lines;i++){
     term.draw_text(start_row + i, start_col, std::string(art[i]));
-    term.clear_to_eol(start_row + i, start_col + (int)std::strlen(art[i]));
+    term.clear_to_eol(start_row + i, start_col + static_cast<int>(std::strlen(art[i])));
   }
 }
 
@@ -95,12 +95,12 @@ void Renderer::render(ITerminal& term,
     int line_idx = vp.top_line + i;
     if (line_idx >= buf.line_count()) break;
     const auto& s = buf.line(line_idx);
-    int s_len = (int)s.size();
+    int s_len = static_cast<int>(s.size());
     int start_col = std::min(std::max(0, vp.left_col), s_len);
     int end_col = std::min(s_len, start_col + std::max(0, text_cols));
     if (show_line_numbers) {
       std::string num = std::to_string(line_idx + 1);
-      std::string pad(std::max(0, ln_width - (int)num.size()), ' ');
+      std::string pad(std::max(0, ln_width - static_cast<int>(num.size())), ' ');
       term.draw_text(i, 0, pad + num + " ");
     }
     if (visual_active) {
@@ -109,12 +109,12 @@ void Renderer::render(ITerminal& term,
       if (mode == Mode::VisualLine) {
         if (line_idx >= r0 && line_idx <= r1) {
           std::string vis = s.substr(start_col, end_col - start_col);
-          term.draw_highlighted(i, indent, vis, 0, (int)vis.size());
-          term.clear_to_eol(i, indent + (int)vis.size());
+          term.draw_highlighted(i, indent, vis, 0, static_cast<int>(vis.size()));
+          term.clear_to_eol(i, indent + static_cast<int>(vis.size()));
         } else {
           std::string vis = s.substr(start_col, end_col - start_col);
           term.draw_text(i, indent, vis);
-          term.clear_to_eol(i, indent + (int)vis.size());
+          term.clear_to_eol(i, indent + static_cast<int>(vis.size()));
         }
       } else if (mode == Mode::Visual) {
         auto is_ascii_line = [](const std::string& t){ for (unsigned char c : t) { if (c >= 128) return false; } return true; };
@@ -126,25 +126,25 @@ void Renderer::render(ITerminal& term,
         if (line_idx == r0 && line_idx == r1) {
           int c0 = std::min(visual_anchor.col, cur.col);
           int c1 = std::max(visual_anchor.col, cur.col);
-          c0 = std::max(0, std::min(c0, (int)s.size()));
-          c1 = std::max(0, std::min(c1, (int)s.size()));
+          c0 = std::max(0, std::min(c0, static_cast<int>(s.size())));
+          c1 = std::max(0, std::min(c1, static_cast<int>(s.size())));
           int hs = std::max(0, c0 - start_col);
           int he = std::max(0, std::min(c1, end_col) - start_col);
           int hlen = std::max(0, he - hs);
           term.draw_highlighted(i, indent, vis, hs, hlen);
         } else if (line_idx == r0) {
           int c0 = std::min(visual_anchor.col, cur.col);
-          c0 = std::max(0, std::min(c0, (int)s.size()));
+          c0 = std::max(0, std::min(c0, static_cast<int>(s.size())));
           int hs = std::max(0, c0 - start_col);
           int hlen = std::max(0, end_col - std::max(start_col, c0));
           term.draw_highlighted(i, indent, vis, hs, hlen);
         } else if (line_idx == r1) {
           int c1 = std::max(visual_anchor.col, cur.col);
-          c1 = std::max(0, std::min(c1, (int)s.size()));
+          c1 = std::max(0, std::min(c1, static_cast<int>(s.size())));
           int hlen = std::max(0, std::min(c1, end_col) - start_col);
           term.draw_highlighted(i, indent, vis, 0, hlen);
         } else if (line_idx > r0 && line_idx < r1) {
-          term.draw_highlighted(i, indent, vis, 0, (int)vis.size());
+          term.draw_highlighted(i, indent, vis, 0, static_cast<int>(vis.size()));
         } else {
           term.draw_text(i, indent, vis);
         }
@@ -163,17 +163,17 @@ void Renderer::render(ITerminal& term,
       auto isWord = [](unsigned char c){ return std::isalnum(c) != 0 || c == '_'; };
       int cols = term.getSize().cols;
       int col = indent;
-      int n = (int)vis_line.size();
+      int n = static_cast<int>(vis_line.size());
       int p = 0;
       while (p < n) {
-        if (!isWord((unsigned char)vis_line[p])) {
+        if (!isWord(static_cast<unsigned char>(vis_line[p]))) {
           int start = p;
-          while (p < n && !isWord((unsigned char)vis_line[p])) p++;
+          while (p < n && !isWord(static_cast<unsigned char>(vis_line[p]))) p++;
           term.draw_text(i, col, vis_line.substr(start, p - start));
           col += (p - start);
         } else {
           int start = p;
-          while (p < n && isWord((unsigned char)vis_line[p])) p++;
+          while (p < n && isWord(static_cast<unsigned char>(vis_line[p]))) p++;
           std::string tok = vis_line.substr(start, p - start);
           if (kwords_global.find(tok) != kwords_global.end()) {
             term.draw_colored(i, col, tok, 1);
@@ -186,7 +186,7 @@ void Renderer::render(ITerminal& term,
       }
     } else if (!visual_active) {
       term.draw_text(i, indent, vis_line);
-      term.clear_to_eol(i, indent + (int)vis_line.size());
+      term.clear_to_eol(i, indent + static_cast<int>(vis_line.size()));
     }
   }
   }
@@ -212,7 +212,7 @@ void Renderer::render(ITerminal& term,
   int screen_row = cur.row - vp.top_line;
   if (screen_row >= 0 && screen_row < max_text_rows) {
     int want_col = cur.col;
-    int line_len = (int)buf.line(cur.row).size();
+  int line_len = static_cast<int>(buf.line(cur.row).size());
     if (want_col > line_len) want_col = line_len;
     int screen_col = indent + std::max(0, want_col - std::max(0, vp.left_col));
     screen_col = std::min(screen_col, cols - 1);

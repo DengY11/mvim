@@ -24,13 +24,13 @@ void NcursesTerminal::clear() { erase(); }
 
 void NcursesTerminal::draw_text(int row, int col, const std::string& text) {
   if (has_colors()) attron(COLOR_PAIR(2));
-  mvaddnstr(row, col, text.c_str(), (int)text.size());
+  mvaddnstr(row, col, text.c_str(), static_cast<int>(text.size()));
   if (has_colors()) attroff(COLOR_PAIR(2));
 }
 
 void NcursesTerminal::draw_highlighted(int row, int col, const std::string& text, int hl_start, int hl_len) {
   int cols = getSize().cols;
-  int len = (int)text.size();
+  int len = static_cast<int>(text.size());
   if (hl_start < 0) hl_start = 0;
   if (hl_len < 0) hl_len = 0;
   int hl_end = std::min(len, hl_start + hl_len);
@@ -47,25 +47,25 @@ void NcursesTerminal::draw_highlighted(int row, int col, const std::string& text
   }
   if (hl_start > 0) {
     std::string left = text.substr(0, hl_start);
-    mvaddnstr(row, col, left.c_str(), (int)left.size());
-    col += (int)left.size();
+    mvaddnstr(row, col, left.c_str(), static_cast<int>(left.size()));
+    col += static_cast<int>(left.size());
   }
   if (hl_end > hl_start) {
     std::string mid = text.substr(hl_start, hl_end - hl_start);
     attron(A_REVERSE);
-    mvaddnstr(row, col, mid.c_str(), (int)mid.size());
+    mvaddnstr(row, col, mid.c_str(), static_cast<int>(mid.size()));
     attroff(A_REVERSE);
-    col += (int)mid.size();
+    col += static_cast<int>(mid.size());
   }
   if (hl_end < len) {
     std::string right = text.substr(hl_end);
-    mvaddnstr(row, col, right.c_str(), (int)right.size());
+    mvaddnstr(row, col, right.c_str(), static_cast<int>(right.size()));
   }
 }
 
 void NcursesTerminal::draw_colored(int row, int col, const std::string& text, int color_pair_id) {
   if (has_colors()) attron(COLOR_PAIR(color_pair_id));
-  mvaddnstr(row, col, text.c_str(), (int)text.size());
+  mvaddnstr(row, col, text.c_str(), static_cast<int>(text.size()));
   if (has_colors()) attroff(COLOR_PAIR(color_pair_id));
 }
 

@@ -34,19 +34,19 @@ void UndoManager::undo(TextBuffer& buf, Cursor& cur) {
   if (undo_entries_.empty()) return;
   UndoEntry e = undo_entries_.back();
   undo_entries_.pop_back();
-  for (int i = (int)e.ops.size() - 1; i >= 0; --i) {
+  for (int i = static_cast<int>(e.ops.size()) - 1; i >= 0; --i) {
     const Operation& op = e.ops[i];
     switch (op.type) {
       case Operation::InsertChar: {
         std::string s = buf.line(op.row);
-        if (op.col < (int)s.size()) {
+        if (op.col < static_cast<int>(s.size())) {
           s.erase(s.begin() + op.col);
           buf.replace_line(op.row, s);
         }
       } break;
       case Operation::DeleteChar: {
         std::string s = buf.line(op.row);
-        if (op.col <= (int)s.size()) {
+        if (op.col <= static_cast<int>(s.size())) {
           s.insert(s.begin() + op.col, op.payload[0]);
           buf.replace_line(op.row, s);
         }
@@ -93,14 +93,14 @@ void UndoManager::redo(TextBuffer& buf, Cursor& cur) {
     switch (op.type) {
       case Operation::InsertChar: {
         std::string s = buf.line(op.row);
-        if (op.col <= (int)s.size()) {
+        if (op.col <= static_cast<int>(s.size())) {
           s.insert(s.begin() + op.col, op.payload[0]);
           buf.replace_line(op.row, s);
         }
       } break;
       case Operation::DeleteChar: {
         std::string s = buf.line(op.row);
-        if (op.col < (int)s.size()) {
+        if (op.col < static_cast<int>(s.size())) {
           s.erase(s.begin() + op.col);
           buf.replace_line(op.row, s);
         }
