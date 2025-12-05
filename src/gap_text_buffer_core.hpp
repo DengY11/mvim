@@ -44,3 +44,5 @@ public:
   void do_replace_line(size_t row, const std::string& s) { replace_line(row, s); }
   void do_replace_line(size_t row, std::string_view s) { replace_line(row, s); }
 };
+
+static_assert(TextBufferCoreCRTPConcept<GapTextBufferCore>, "Gap backend must satisfy CRTP concept");

@@ -67,3 +67,5 @@ public:
 private:
   std::vector<std::string> lines_;
 };
+
+static_assert(TextBufferCoreCRTPConcept<VectorTextBufferCore>, "Vector backend must satisfy CRTP concept");

@@ -25,12 +25,14 @@ class TextBuffer {
 public:
   TextBuffer();
 #if TB_BACKEND == TB_BACKEND_GAP
-  GapTextBufferCore core;
+  using CoreType = GapTextBufferCore;
 #elif TB_BACKEND == TB_BACKEND_ROPE
-  RopeTextBufferCore core;
+  using CoreType = RopeTextBufferCore;
 #else
-  VectorTextBufferCore core;
+  using CoreType = VectorTextBufferCore;
 #endif
+  static_assert(TextBufferCoreCRTPConcept<CoreType>, "Selected backend must satisfy CRTP concept");
+  CoreType core;
 
   std::string_view backend_name() const;
   bool empty() const;

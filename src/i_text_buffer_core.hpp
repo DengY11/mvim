@@ -3,6 +3,10 @@
 #include <vector>
 #include <string_view>
 #include <span>
+#include <concepts>
+#include <utility>
+
+
 
 template <typename Derived>
 class TextBufferCoreCRTP {
@@ -26,4 +30,28 @@ public:
 private:
   Derived& as_derived() { return static_cast<Derived&>(*this); }
   const Derived& as_const_derived() const { return static_cast<const Derived&>(*this); }
+};
+
+template <typename D>
+concept TextBufferCoreCRTPConcept = requires(
+  D d, const D cd,
+  const std::vector<std::string>& lines,
+  std::span<const std::string> span_lines,
+  size_t row, size_t start_row, size_t end_row,
+  int r,
+  const std::string& s,
+  std::string_view sv
+) {
+  { cd.get_name_sv() } -> std::convertible_to<std::string_view>;
+  { d.do_init_from_lines(lines) } -> std::same_as<void>;
+  { cd.do_line_count() } -> std::convertible_to<int>;
+  { cd.do_get_line(r) } -> std::convertible_to<std::string>;
+  { d.do_insert_line(row, s) } -> std::same_as<void>;
+  { d.do_insert_line(row, sv) } -> std::same_as<void>;
+  { d.do_insert_lines(row, lines) } -> std::same_as<void>;
+  { d.do_insert_lines(row, span_lines) } -> std::same_as<void>;
+  { d.do_erase_line(row) } -> std::same_as<void>;
+  { d.do_erase_lines(start_row, end_row) } -> std::same_as<void>;
+  { d.do_replace_line(row, s) } -> std::same_as<void>;
+  { d.do_replace_line(row, sv) } -> std::same_as<void>;
 };
