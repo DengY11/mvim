@@ -22,6 +22,7 @@ add_executable(mvim
   src/input.cpp
   src/ncurses_terminal.cpp
   src/file_reader.cpp
+  src/editor_commands.cpp
   src/editor.cpp
   src/undo_manager.cpp
 )

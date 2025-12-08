@@ -29,6 +29,7 @@ private:
   int tab_width = 4;
   bool show_line_numbers = false;
   bool enable_color = true;
+  bool enable_mouse = false;
   UndoManager um;
   bool modified = false;
   bool should_quit = false;
@@ -52,7 +53,9 @@ private:
   void handle_normal_input(int ch);
   void handle_insert_input(int ch);
   void handle_command_input(int ch);
+  void handle_mouse();
   void execute_command();
+  void register_commands();
   void move_left();
   void move_right();
   void move_up();

@@ -70,90 +70,7 @@ Editor::Editor(const std::optional<std::filesystem::path>& file)
   } else {
     buf.ensure_not_empty();
   }
-  registry.register_command("w", [this](const std::vector<std::string>& args){
-    std::string mm;
-    if (!args.empty()) { if (buf.write_file(args[0], mm)) { modified = false; } message = mm; }
-    else if (file_path) { if (buf.write_file(*file_path, mm)) { modified = false; } message = mm; }
-    else { message = "don't have path, use :w <path>"; }
-  });
-  registry.register_command("q", [this](const std::vector<std::string>&){
-    if (modified) { message = "have unsaved changes, use :w or :q! quit"; }
-    else { should_quit = true; }
-  });
-  registry.register_command("q!", [this](const std::vector<std::string>&){ should_quit = true; });
-  registry.register_command("wq", [this](const std::vector<std::string>& args){
-    std::string mm;
-    if (file_path) { if (buf.write_file(*file_path, mm)) { modified = false; should_quit = true; } message = mm; }
-    else {
-      if (!args.empty()) { if (buf.write_file(args[0], mm)) { modified = false; should_quit = true; } message = mm; }
-      else { if (!modified) { should_quit = true; message = "dont have path, and no changes, quit"; } else { message = "dont have path: use :wq <path>"; } }
-    }
-  });
-  registry.register_command("set number", [this](const std::vector<std::string>& args){
-    if (args.empty()){
-      if (show_line_numbers) { show_line_numbers = false; message = "number off"; }
-      else { show_line_numbers = true; message = "number on"; }
-    }else{
-      message = "set number: use :set number on|off";
-      std::string opt = args[0];
-      if (opt == "on") { show_line_numbers = true; message = "number on"; }
-      else if (opt == "off") { show_line_numbers = false; message = "number off"; }
-      else { message = "set number: use :set number on|off"; }
-    }
-  });
-  registry.register_command("set pair", [this](const std::vector<std::string>& args){
-    if (args.empty()){
-      if (auto_pair) { auto_pair = false; message = "auto-pair off"; }
-      else { auto_pair = true; message = "auto-pair on"; }
-    }else{
-      message = "set pair: use :set pair on|off";
-      std::string opt = args[0];
-      if (opt == "on") { auto_pair = true; message = "auto-pair on"; }
-      else if (opt == "off") { auto_pair = false; message = "auto-pair off"; }
-      else { message = "set pair: use :set pair on|off"; }
-    }
-  });
-  registry.register_command("set tabwidth", [this](const std::vector<std::string>& args){
-    if (args.empty()) { message = "set tabwidth: use :set tabwidth <width>"; return; }
-    const std::string& s = args[0];
-    if (s.empty()) { message = "set tabwidth: width must be a number"; return; }
-    bool ok = std::all_of(s.begin(), s.end(), [](unsigned char c){ return std::isdigit(c) != 0; });
-    if (!ok) { message = "set tabwidth: width must be a number"; return; }
-    int w = 0;
-    try { w = std::stoi(s); } catch (...) { message = "set tabwidth: invalid number"; return; }
-    if (w < 1) { message = "set tabwidth: width must be >= 1"; return; }
-    set_tab_width(w);
-  });
-  registry.register_command("set color", [this](const std::vector<std::string>& args){
-    if (args.empty()) { message = "set color: use :set color on|off"; return; }
-    std::string v = args[0];
-    if (v == "on" || v == "1" || v == "true") { enable_color = true; message = "color on"; }
-    else if (v == "off" || v == "0" || v == "false") { enable_color = false; message = "color off"; }
-    else { message = "set color: value must be on|off"; }
-  });
-  registry.register_command("set background", [this](const std::vector<std::string>& args){
-    if (args.empty()) { message = "set background: use :set background default|black|white|green|yellow"; return; }
-    auto to_lower = [](std::string s){ for (auto& c: s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c))); return s; };
-    std::string v = to_lower(args[0]);
-    short col = -1;
-    if (v == "default" || v == "normal") col = -1;
-    else if (v == "black") col = COLOR_BLACK;
-    else if (v == "white") col = COLOR_WHITE;
-    else if (v == "green") col = COLOR_GREEN;
-    else if (v == "yellow") col = COLOR_YELLOW;
-    else if (v == "red") col = COLOR_RED;
-    else if (v == "blue") col = COLOR_BLUE;
-    else if (v == "magenta") col = COLOR_MAGENTA;
-    else if (v == "cyan") col = COLOR_CYAN;
-    else { message = "set background: unknown color"; return; }
-    term.setBackground(col);
-    message = std::string("background=") + v;
-  });
-  registry.register_command("backend", [this](const std::vector<std::string>& args){
-    (void)args;
-    message = "backend=";
-    message += buf.backend_name();
-  });
+  register_commands();
 
   load_rc();
 }
@@ -173,6 +90,7 @@ void Editor::push_op(const Operation& op) { um.push_op(op); }
 void Editor::render() { renderer.render(term, buf, cur, vp, mode, file_path, modified, message, cmdline, visual_active, visual_anchor, show_line_numbers, enable_color); }
 
 void Editor::handle_input(int ch) {
+  if (enable_mouse && ch == KEY_MOUSE) { handle_mouse(); return; }
   if (mode == Mode::Command) { handle_command_input(ch); return; }
   if (mode == Mode::Insert) { handle_insert_input(ch); return; }
   handle_normal_input(ch);
@@ -356,6 +274,47 @@ void Editor::handle_command_input(int ch) {
   if (ch == KEY_BACKSPACE || ch == 127) { if (!cmdline.empty()) cmdline.pop_back(); return; }
   if (ch == '\n' || ch == KEY_ENTER || ch == '\r') { execute_command(); mode = Mode::Normal; return; }
   if (ch >= 32 && ch <= 126) { cmdline.push_back((char)ch); }
+}
+
+void Editor::handle_mouse() {
+  MEVENT me; if (getmouse(&me) != OK) return;
+  TermSize sz = term.getSize();
+  int rows = sz.rows, cols = sz.cols; (void)cols;
+  int max_text_rows = std::max(0, rows - 1);
+  int wheel_step = 3;
+  if (max_text_rows > 0) wheel_step = std::max(1, max_text_rows / 6);
+  #ifdef BUTTON4_PRESSED
+  if (me.bstate & BUTTON4_PRESSED) {
+    int max_top = std::max(0, buf.line_count() - max_text_rows);
+    vp.top_line = std::max(0, vp.top_line - wheel_step);
+    vp.top_line = std::min(vp.top_line, max_top);
+    return;
+  }
+  #endif
+  #ifdef BUTTON5_PRESSED
+  if (me.bstate & BUTTON5_PRESSED) {
+    int max_top = std::max(0, buf.line_count() - max_text_rows);
+    vp.top_line = std::min(max_top, vp.top_line + wheel_step);
+    return;
+  }
+  #endif
+  if (me.y < 0 || me.y >= rows) return;
+  if (me.y == rows - 1) return; // ignore status/command line
+  int digits = 1; int total = std::max(1, buf.line_count());
+  while (total >= 10) { total /= 10; digits++; }
+  int indent = show_line_numbers ? (digits + 1) : 0;
+  int screen_row = me.y;
+  int buf_row = vp.top_line + screen_row;
+  buf_row = std::clamp(buf_row, 0, std::max(0, buf.line_count() - 1));
+  int screen_col = me.x;
+  if (screen_col < indent) return; // clicking in line-number gutter does nothing
+  int rel = screen_col - indent;
+  int buf_col = vp.left_col + rel;
+  int line_len = (buf_row >= 0 && buf_row < buf.line_count()) ? (int)buf.line(buf_row).size() : 0;
+  buf_col = std::clamp(buf_col, 0, line_len);
+  if (me.bstate & (BUTTON1_CLICKED | BUTTON1_PRESSED | BUTTON1_RELEASED | BUTTON1_DOUBLE_CLICKED)) {
+    cur.row = buf_row; cur.col = buf_col;
+  }
 }
 
 void Editor::execute_command() {
