@@ -63,7 +63,7 @@ private:
   void delete_char();
   void delete_line();
   void delete_lines_range(int start_row, int count);
-  void yank_current_line();
+  void reg_push_line(int row);
   void paste_below();
   void insert_line_below();
   void insert_line_above();

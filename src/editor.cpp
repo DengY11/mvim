@@ -146,7 +146,7 @@ void Editor::handle_normal_input(int ch) {
       break;
     case 'y':
       if (mode == Mode::Visual || mode == Mode::VisualLine) { yank_selection(); exit_visual(); }
-      else if (input.consumeYy('y')) { size_t n = input.takeCount(); if (n == 0) n = 1; while (n--) yank_current_line(); }
+      else if (input.consumeYy('y')) { size_t n = input.takeCount(); if (n == 0) n = 1; for (int i = 0; i < (int)n; ++i) reg_push_line(cur.row+i); }
       else { pending_op = PendingOp::Yank; }
       break;
     case 'p': paste_below(); break;
@@ -662,7 +662,11 @@ void Editor::delete_lines_range(int start_row, int count) {
   modified = true; um.clear_redo();
 }
 
-void Editor::yank_current_line() { reg.lines = { buf.line(cur.row) }; reg.linewise = true; }
+void Editor::reg_push_line(int row) {
+  if (row < 0 || row >= buf.line_count()) return;
+  reg.lines.push_back(buf.line(row));
+  reg.linewise = true;/*paste whole line*/
+}
 
 void Editor::paste_below() {
   int insert_row = cur.row + 1;
