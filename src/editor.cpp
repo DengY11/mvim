@@ -257,21 +257,29 @@ void Editor::begin_insert_buffer() {
 
 void Editor::apply_insert_char(int ch) {
   if (!insert_buffer_active || insert_buffer_row != cur.row) begin_insert_buffer();
+  begin_group();
   if (cur.col < 0) cur.col = 0;
   if (cur.col > static_cast<int>(insert_buffer_line.size())) cur.col = static_cast<int>(insert_buffer_line.size());
   insert_buffer_line.insert(insert_buffer_line.begin() + cur.col, static_cast<char>(ch));
   push_op({Operation::InsertChar, cur.row, cur.col, std::string(1, (char)ch), std::string()});
   modified = true;
   cur.col++;
+  buf.replace_line(insert_buffer_row, insert_buffer_line);
+  um.clear_redo();
+  commit_group();
 }
 
 void Editor::apply_backspace() {
   if (!insert_buffer_active || insert_buffer_row != cur.row) begin_insert_buffer();
   if (cur.col > 0) {
+    begin_group();
     char c = insert_buffer_line[cur.col - 1];
     insert_buffer_line.erase(insert_buffer_line.begin() + cur.col - 1);
     push_op({Operation::DeleteChar, cur.row, cur.col - 1, std::string(1, c), std::string()});
     cur.col--; modified = true;
+    buf.replace_line(insert_buffer_row, insert_buffer_line);
+    um.clear_redo();
+    commit_group();
   } else {
     // At line start: commit buffer then use existing merge logic
     commit_insert_buffer();
@@ -284,9 +292,10 @@ void Editor::commit_insert_buffer() {
   if (insert_buffer_active) {
     std::string old = buf.line(insert_buffer_row);
     std::string neu = insert_buffer_line;
+    // 若已在逐字符写回，则 old == neu，不再推送整行 ReplaceLine，以避免一次性撤销整行
     if (old != neu) {
-      push_op({Operation::ReplaceLine, insert_buffer_row, cur.col, old, neu});
       buf.replace_line(insert_buffer_row, neu);
+      push_op({Operation::ReplaceLine, insert_buffer_row, cur.col, old, neu});
       um.clear_redo();
     }
     insert_buffer_active = false;
