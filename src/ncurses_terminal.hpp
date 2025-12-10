@@ -21,6 +21,8 @@ public:
   void refresh() override;
   void clear_to_eol(int row, int col) override;
   void setBackground(short color);
+  void setSearchHighlight(short color);
 private:
   short bg_color_ = -1; // -1: default background
+  short searchhl_color_ = COLOR_CYAN;
 };

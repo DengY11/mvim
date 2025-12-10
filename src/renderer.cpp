@@ -193,7 +193,8 @@ void Renderer::render(ITerminal& term,
           cursor = h.col;
         }
         int hl_len = h.len;
-        term.draw_highlighted(row_screen, col_draw, vis_line.substr(cursor, hl_len), 0, hl_len);
+        // Use a distinct color pair (3) for search highlight segments
+        term.draw_colored(row_screen, col_draw, vis_line.substr(cursor, hl_len), 3);
         col_draw += hl_len;
         cursor += hl_len;
       }

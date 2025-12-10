@@ -12,6 +12,8 @@ NcursesTerminal::NcursesTerminal() {
     }
     // default background pair
     init_pair(2, -1, -1);
+    // search highlight pair (distinct background)
+    init_pair(3, -1, searchhl_color_);
   }
 }
 NcursesTerminal::~NcursesTerminal() {}
@@ -81,9 +83,16 @@ void NcursesTerminal::setBackground(short color) {
   wbkgd(stdscr, COLOR_PAIR(2));
   // Keep keyword pair background in sync
   init_pair(1, COLOR_YELLOW, bg_color_);
+  // search highlight keeps its own distinct background; no change here
   erase();
 }
 void NcursesTerminal::clear_to_eol(int row, int col) {
   move(row, col);
   clrtoeol();
+}
+
+void NcursesTerminal::setSearchHighlight(short color) {
+  if (!has_colors()) return;
+  searchhl_color_ = color;
+  init_pair(3, -1, searchhl_color_);
 }

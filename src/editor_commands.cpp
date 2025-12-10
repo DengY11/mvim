@@ -84,6 +84,24 @@ void Editor::register_commands() {
     term.setBackground(col);
     message = std::string("background=") + v;
   });
+  registry.register_command("set searchcolor", [this](const std::vector<std::string>& args){
+    if (args.empty()) { message = "set searchcolor: use :set searchcolor default|black|white|red|green|blue|yellow|magenta|cyan"; return; }
+    auto to_lower = [](std::string s){ for (auto& c: s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c))); return s; };
+    std::string v = to_lower(args[0]);
+    short col = -1;
+    if (v == "default" || v == "normal") col = -1;
+    else if (v == "black") col = COLOR_BLACK;
+    else if (v == "white") col = COLOR_WHITE;
+    else if (v == "red") col = COLOR_RED;
+    else if (v == "green") col = COLOR_GREEN;
+    else if (v == "blue") col = COLOR_BLUE;
+    else if (v == "yellow") col = COLOR_YELLOW;
+    else if (v == "magenta") col = COLOR_MAGENTA;
+    else if (v == "cyan") col = COLOR_CYAN;
+    else { message = "set searchhl: unknown color"; return; }
+    term.setSearchHighlight(col);
+    message = std::string("searchhl=") + v;
+  });
   registry.register_command("backend", [this](const std::vector<std::string>& args){
     (void)args;
     message = "backend=";
@@ -134,4 +152,3 @@ void Editor::register_commands() {
     }
   });
 }
-
