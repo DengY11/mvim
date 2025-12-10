@@ -150,7 +150,15 @@ void Editor::handle_normal_input(int ch) {
       break;
     case 'y':
       if (mode == Mode::Visual || mode == Mode::VisualLine) { yank_selection(); exit_visual(); }
-      else if (input.consumeYy('y')) { size_t n = input.takeCount(); if (n == 0) n = 1; for (int i = 0; i < (int)n; ++i) reg_push_line(cur.row+i); }
+      else if (input.consumeYy('y')) {
+        size_t n = input.takeCount(); if (n == 0) n = 1;
+        reg.lines.clear(); reg.linewise = true; reg.lines.reserve(n);
+        for (int i = 0; i < (int)n; ++i) {
+          int r = cur.row + i; if (r < 0 || r >= buf.line_count()) break;
+          reg.lines.push_back(buf.line(r));
+        }
+        input.reset(); pending_op = PendingOp::None;
+      }
       else { pending_op = PendingOp::Yank; }
       break;
     case 'p': paste_below(); break;
