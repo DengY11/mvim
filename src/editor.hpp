@@ -44,6 +44,7 @@ private:
   bool visual_active = false;
   bool last_search_forward = true;
   std::string last_search;
+  std::vector<SearchHit> last_search_hits;
   bool auto_pair = false;
   enum class PendingOp { None, Delete, Yank };
   PendingOp pending_op = PendingOp::None;
@@ -77,6 +78,7 @@ private:
   void search_forward(const std::string& pattern);
   void search_backward(const std::string& pattern);
   void repeat_last_search(bool is_forward);
+  void recompute_search_hits(const std::string& pattern);
   void delete_to_next_word();
   void yank_to_next_word();
   void delete_to_word_end();

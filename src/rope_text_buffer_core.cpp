@@ -1,5 +1,9 @@
 #include "rope_text_buffer_core.hpp"
 #include <algorithm>
+#include <numeric>
+
+static constexpr size_t LEAF_MAX_LINES = 128;
+static constexpr size_t LEAF_MIN_LINES = 64;
 
 void RopeTextBufferCore::recalc(Node* n) {
   if (!n) return;
@@ -141,9 +145,47 @@ std::string RopeTextBufferCore::get_line_at(const Node* n, size_t r) {
   return std::string();
 }
 
+
+std::unique_ptr<RopeTextBufferCore::Node>
+RopeTextBufferCore::normalize_node(std::unique_ptr<Node> n) {
+  if (!n) return nullptr;
+  if (n->left.get() == nullptr && n->right.get() == nullptr) {
+    size_t sz = n->lines.size();
+    if (sz <= LEAF_MAX_LINES) { recalc(n.get()); return n; }
+    size_t mid = sz / 2;
+    std::vector<std::string> left_lines; left_lines.reserve(mid);
+    std::vector<std::string> right_lines; right_lines.reserve(sz - mid);
+    for (size_t i = 0; i < sz; ++i) {
+      if (i < mid) left_lines.push_back(n->lines[i]); else right_lines.push_back(n->lines[i]);
+    }
+    auto L = make_leaf(std::move(left_lines));
+    auto R = make_leaf(std::move(right_lines));
+    return balance(concat(std::move(L), std::move(R)));
+  }
+
+  n->left = normalize_node(std::move(n->left));
+  n->right = normalize_node(std::move(n->right));
+
+  if (n->left && n->right && n->left->left.get() == nullptr && n->left->right.get() == nullptr && n->right->left.get() == nullptr && n->right->right.get() == nullptr) {
+    size_t lsz = n->left->lines.size();
+    size_t rsz = n->right->lines.size();
+    if (lsz + rsz <= LEAF_MAX_LINES) {
+      std::vector<std::string> merged; merged.reserve(lsz + rsz);
+      for (auto& s : n->left->lines) merged.push_back(std::move(s));
+      for (auto& s : n->right->lines) merged.push_back(std::move(s));
+      auto leaf = make_leaf(std::move(merged));
+      return leaf;
+    }
+  }
+
+  recalc(n.get());
+  return balance(std::move(n));
+}
+
 void RopeTextBufferCore::init_from_lines(const std::vector<std::string>& lines) {
   if (lines.empty()) { root_.reset(); return; }
   root_ = build_balanced_parallel(lines, 0, lines.size());
+  root_ = normalize_node(std::move(root_));
 }
 
 int RopeTextBufferCore::line_count() const { return static_cast<int>(count_lines(root_.get())); }
@@ -163,6 +205,7 @@ void RopeTextBufferCore::insert_line(size_t row, std::string_view s) {
   std::vector<std::string> single{std::string(s)};
   auto M = make_leaf(std::move(single));
   root_ = concat(concat(std::move(A), std::move(M)), std::move(B));
+  root_ = normalize_node(std::move(root_));
 }
 
 void RopeTextBufferCore::insert_lines(size_t row, const std::vector<std::string>& ss) {
@@ -177,6 +220,7 @@ void RopeTextBufferCore::insert_lines(size_t row, std::span<const std::string> s
   std::vector<std::string> temp; temp.reserve(ss.size()); for (const auto& s : ss) temp.push_back(s);
   auto M = (ss.size() >= 4096) ? build_balanced_parallel(temp, 0, temp.size()) : build_balanced(temp, 0, temp.size());
   root_ = concat(concat(std::move(A), std::move(M)), std::move(B));
+  root_ = normalize_node(std::move(root_));
 }
 
 void RopeTextBufferCore::erase_line(size_t row) {
@@ -184,6 +228,7 @@ void RopeTextBufferCore::erase_line(size_t row) {
   auto [A, B] = split(std::move(root_), row);
   auto [M, C] = split(std::move(B), 1);
   root_ = concat(std::move(A), std::move(C));
+  root_ = normalize_node(std::move(root_));
 }
 
 void RopeTextBufferCore::erase_lines(size_t start_row, size_t end_row) {
@@ -193,6 +238,7 @@ void RopeTextBufferCore::erase_lines(size_t start_row, size_t end_row) {
   auto [A, B] = split(std::move(root_), start_row);
   auto [M, C] = split(std::move(B), end_row - start_row);
   root_ = concat(std::move(A), std::move(C));
+  root_ = normalize_node(std::move(root_));
 }
 
 void RopeTextBufferCore::replace_line(size_t row, const std::string& s) { replace_line(row, std::string_view(s)); }
@@ -204,4 +250,5 @@ void RopeTextBufferCore::replace_line(size_t row, std::string_view s) {
   std::vector<std::string> single{std::string(s)};
   auto M2 = make_leaf(std::move(single));
   root_ = concat(concat(std::move(A), std::move(M2)), std::move(C));
+  root_ = normalize_node(std::move(root_));
 }

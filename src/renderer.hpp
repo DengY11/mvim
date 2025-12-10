@@ -27,5 +27,6 @@ public:
               bool visual_active,
               Cursor visual_anchor,
               bool show_line_numbers,
-              bool enable_color);
+              bool enable_color,
+              const std::vector<SearchHit>& search_hits);
 };

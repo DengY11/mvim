@@ -57,7 +57,8 @@ void Renderer::render(ITerminal& term,
                       bool visual_active,
                       Cursor visual_anchor,
                       bool show_line_numbers,
-                      bool enable_color) {
+                      bool enable_color,
+                      const std::vector<SearchHit>& search_hits) {
   TermSize sz = term.getSize();
   int rows = sz.rows, cols = sz.cols;
   term.clear();
@@ -159,7 +160,51 @@ void Renderer::render(ITerminal& term,
       return true;
     };
     std::string vis_line = s.substr(start_col, end_col - start_col);
-    if (!visual_active && enable_color && is_ascii_line(vis_line)) {
+    // Search highlight (disable during visual selection)
+    auto draw_with_search_highlight = [&](const std::string& full_line, int row_screen, int start_col_full, int end_col_full){
+      // collect hits in this line
+      std::vector<SearchHit> hits;
+      for (const auto& h : search_hits) if (h.row == line_idx) hits.push_back(h);
+      // filter visible range
+      std::vector<SearchHit> vis_hits;
+      for (const auto& h : hits) {
+        int h_start = h.col;
+        int h_end = h.col + h.len;
+        if (h_end <= start_col_full || h_start >= end_col_full) continue;
+        int vis_start = std::max(h_start, start_col_full) - start_col_full;
+        int vis_len = std::min(h_end, end_col_full) - std::max(h_start, start_col_full);
+        if (vis_len > 0) vis_hits.push_back({line_idx, vis_start, vis_len});
+      }
+      if (vis_hits.empty()) {
+        term.draw_text(row_screen, indent, vis_line);
+        term.clear_to_eol(row_screen, indent + (int)vis_line.size());
+        return;
+      }
+      int col_draw = indent;
+      int cursor = 0;
+      // sort by start
+      std::sort(vis_hits.begin(), vis_hits.end(), [](const SearchHit& a, const SearchHit& b){ return a.col < b.col; });
+      for (const auto& h : vis_hits) {
+        if (h.col > cursor) {
+          term.draw_text(row_screen, col_draw, vis_line.substr(cursor, h.col - cursor));
+          col_draw += (h.col - cursor);
+          cursor = h.col;
+        }
+        int hl_len = h.len;
+        term.draw_highlighted(row_screen, col_draw, vis_line.substr(cursor, hl_len), 0, hl_len);
+        col_draw += hl_len;
+        cursor += hl_len;
+      }
+      if (cursor < (int)vis_line.size()) {
+        term.draw_text(row_screen, col_draw, vis_line.substr(cursor));
+        col_draw += (int)vis_line.size() - cursor;
+      }
+      term.clear_to_eol(row_screen, col_draw);
+    };
+
+    if (!visual_active && !search_hits.empty()) {
+      draw_with_search_highlight(s, i, start_col, end_col);
+    } else if (!visual_active && enable_color && is_ascii_line(vis_line)) {
       auto isWord = [](unsigned char c){ return std::isalnum(c) != 0 || c == '_'; };
       int cols = term.getSize().cols;
       int col = indent;

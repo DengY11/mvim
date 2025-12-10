@@ -60,6 +60,8 @@ private:
   static std::unique_ptr<Node> build_balanced(const std::vector<std::string>& lines, size_t l, size_t r);
   static std::unique_ptr<Node> build_balanced_parallel(const std::vector<std::string>& lines, size_t l, size_t r);
   static std::string get_line_at(const Node* n, size_t r);
+
+  static std::unique_ptr<Node> normalize_node(std::unique_ptr<Node> n);
 };
 
 static_assert(TextBufferCoreCRTPConcept<RopeTextBufferCore>, "Rope backend must satisfy CRTP concept");

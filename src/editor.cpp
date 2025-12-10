@@ -19,7 +19,7 @@ static inline bool is_num(unsigned char c) {
 static inline bool is_word(unsigned char c) {
   return std::isalnum(c) != 0 || c == '_';
 }
-static inline bool is_symble(unsigned char c) {
+static inline bool is_symbol(unsigned char c) {
   return !is_space(c) && !is_word(c);
 }
 static int next_word_start_same_line(const std::string& line, int col) {
@@ -35,7 +35,7 @@ static int next_word_start_same_line(const std::string& line, int col) {
     while (col + 1 < len && (is_word(static_cast<unsigned char>(line[col + 1])) || is_num(static_cast<unsigned char>(line[col + 1])))) col++;
     return std::min(len, col + 1);
   }
-  while (col + 1 < len && is_symble(static_cast<unsigned char>(line[col + 1]))) col++;
+  while (col + 1 < len && is_symbol(static_cast<unsigned char>(line[col + 1]))) col++;
   return std::min(len, col + 1);
 }
 static int next_word_end_same_line(const std::string& line, int col) {
@@ -51,14 +51,14 @@ static int next_word_end_same_line(const std::string& line, int col) {
       while (col + 1 < len && (is_word(static_cast<unsigned char>(line[col + 1])) || is_num(static_cast<unsigned char>(line[col + 1])))) col++;
       return std::min(len, col + 1);
     }
-    while (col + 1 < len && is_symble(static_cast<unsigned char>(line[col + 1]))) col++;
+    while (col + 1 < len && is_symbol(static_cast<unsigned char>(line[col + 1]))) col++;
     return std::min(len, col + 1);
   }
   if (is_word(c) || is_num(c)) {
     while (col + 1 < len && (is_word(static_cast<unsigned char>(line[col + 1])) || is_num(static_cast<unsigned char>(line[col + 1])))) col++;
     return std::min(len, col + 1);
   }
-  while (col + 1 < len && is_symble(static_cast<unsigned char>(line[col + 1]))) col++;
+  while (col + 1 < len && is_symbol(static_cast<unsigned char>(line[col + 1]))) col++;
   return std::min(len, col + 1);
 }
 Editor::Editor(const std::optional<std::filesystem::path>& file)
@@ -87,7 +87,7 @@ void Editor::begin_group() { um.begin_group(cur); }
 void Editor::commit_group() { um.commit_group(cur); }
 void Editor::push_op(const Operation& op) { um.push_op(op); }
 
-void Editor::render() { renderer.render(term, buf, cur, vp, mode, file_path, modified, message, cmdline, visual_active, visual_anchor, show_line_numbers, enable_color); }
+void Editor::render() { renderer.render(term, buf, cur, vp, mode, file_path, modified, message, cmdline, visual_active, visual_anchor, show_line_numbers, enable_color, last_search_hits); }
 
 void Editor::handle_input(int ch) {
   if (enable_mouse && ch == KEY_MOUSE) { handle_mouse(); return; }
@@ -323,6 +323,7 @@ void Editor::execute_command() {
     last_search = pat;
     last_search_forward = (cmdline[0] == '/');
     if (last_search_forward) search_forward(pat); else search_backward(pat);
+    recompute_search_hits(pat);
     return;
   }
   std::istringstream iss(cmdline);
@@ -501,6 +502,27 @@ void Editor::search_backward(const std::string& pattern) {
 void Editor::repeat_last_search(bool is_forward) {
   if (last_search.empty()) { message = "no last search"; return; }
   if (is_forward) search_forward(last_search); else search_backward(last_search);
+  recompute_search_hits(last_search);
+}
+
+void Editor::recompute_search_hits(const std::string& pattern) {
+  last_search_hits.clear();
+  if (pattern.empty()) return;
+  int rows = buf.line_count();
+  for (int r = 0; r < rows; ++r) {
+    const auto& s = buf.line(r);
+    std::vector<int> pos;
+    kmp_find_all(s, pattern, pos);
+    for (int p : pos) last_search_hits.push_back({r, p, (int)pattern.size()});
+  }
+  if (!last_search_hits.empty()) {
+    const SearchHit* next = nullptr;
+    for (const auto& h : last_search_hits) { if (h.row > cur.row || (h.row == cur.row && h.col >= cur.col)) { next = &h; break; } }
+    if (!next) next = &last_search_hits.front();
+    message = std::string("matches:") + std::to_string((int)last_search_hits.size()) + " next " + std::to_string(next->row + 1) + ":" + std::to_string(next->col + 1);
+  } else {
+    message = "not found pattern";
+  }
 }
 
 void Editor::enter_visual_char() {
@@ -693,26 +715,33 @@ void Editor::paste_below() {
     }
     begin_group();
     if (parts.size() == 1) {
-      s.insert(pos, parts[0]);
-      push_op({Operation::ReplaceLine, cur.row, pos, s.substr(0, pos), s});
-      buf.replace_line(cur.row, s);
+      std::string neu = s;
+      neu.insert(pos, parts[0]);
+      push_op({Operation::ReplaceLine, cur.row, pos, s, neu});
+      buf.replace_line(cur.row, neu);
       modified = true; um.clear_redo();
     } else {
       std::string left = s.substr(0, pos);
       std::string right = s.substr(pos);
-      s = left + parts[0];
-      buf.replace_line(cur.row, s);
-      {
-        std::vector<std::string> tail(parts.begin() + 1, parts.end());
+      std::string first_new = left + parts[0];
+      push_op({Operation::ReplaceLine, cur.row, pos, s, first_new});
+      buf.replace_line(cur.row, first_new);
+      std::vector<std::string> tail(parts.begin() + 1, parts.end());
+      // Insert lines as a single block for consistent undo/redo
+      if (!tail.empty()) {
+        std::string block;
+        for (size_t i = 0; i < tail.size(); ++i) { if (i) block.push_back('\n'); block += tail[i]; }
+        push_op({Operation::InsertLinesBlock, insert_row, 0, block, std::string()});
         buf.insert_lines(insert_row, tail);
       }
-      push_op({Operation::InsertLine, insert_row, 0, parts[1], std::string()});
-      for (size_t i = 2; i < parts.size(); ++i) {
-        push_op({Operation::InsertLine, insert_row + (int)i - 1, 0, parts[i], std::string()});
+      // Replace last inserted line to append the original right part
+      int last_row = insert_row + (int)tail.size() - 1;
+      if (!tail.empty()) {
+        std::string last_old = tail.back();
+        std::string last_new = last_old + right;
+        push_op({Operation::ReplaceLine, last_row, 0, last_old, last_new});
+        buf.replace_line(last_row, last_new);
       }
-      std::string last = buf.line(insert_row + (int)parts.size() - 1);
-      last += right;
-      buf.replace_line(insert_row + (int)parts.size() - 1, last);
       modified = true; um.clear_redo();
     }
     commit_group();
@@ -816,7 +845,7 @@ void Editor::move_to_next_word_left(){
       if (cur.row + 1 >= buf.line_count()) { cur.col = len; break; }
       cur.row++; cur.col = 0; continue;
     } else { 
-      while (cur.col + 1 < len && is_symble((unsigned char)line[cur.col + 1])) cur.col++;
+      while (cur.col + 1 < len && is_symbol((unsigned char)line[cur.col + 1])) cur.col++;
       if (cur.col + 1 < len) { cur.col++; }
       else {
         if (cur.row + 1 >= buf.line_count()) { cur.col = len; break; }
@@ -851,7 +880,7 @@ void Editor::move_to_next_word_right() {
         while (cur.col + 1 < len && (is_word((unsigned char)line[cur.col + 1]) || is_num((unsigned char)line[cur.col + 1]))) cur.col++;
         break;
       } else { 
-        while (cur.col + 1 < len && is_symble((unsigned char)line[cur.col + 1])) cur.col++;
+        while (cur.col + 1 < len && is_symbol((unsigned char)line[cur.col + 1])) cur.col++;
         break;
       }
     } else if (is_word(c) || is_num(c)) {
@@ -859,7 +888,7 @@ void Editor::move_to_next_word_right() {
         while (cur.col + 1 < len && (is_word((unsigned char)line[cur.col + 1]) || is_num((unsigned char)line[cur.col + 1]))) cur.col++;
         break;
       } else {
-        if (cur.col + 1 < len && is_symble((unsigned char)line[cur.col + 1])) { cur.col++; break; }
+        if (cur.col + 1 < len && is_symbol((unsigned char)line[cur.col + 1])) { cur.col++; break; }
         cur.col++;
         while (cur.col < len && is_space((unsigned char)line[cur.col])) cur.col++;
         if (cur.col >= len) {
@@ -872,7 +901,7 @@ void Editor::move_to_next_word_right() {
             if (is_word((unsigned char)line2[cur.col]) || is_num((unsigned char)line2[cur.col])) {
               while (cur.col + 1 < len2 && (is_word((unsigned char)line2[cur.col + 1]) || is_num((unsigned char)line2[cur.col + 1]))) cur.col++;
             } else {
-              while (cur.col + 1 < len2 && is_symble((unsigned char)line2[cur.col + 1])) cur.col++;
+              while (cur.col + 1 < len2 && is_symbol((unsigned char)line2[cur.col + 1])) cur.col++;
             }
           }
           break;
@@ -880,14 +909,14 @@ void Editor::move_to_next_word_right() {
           if (is_word((unsigned char)line[cur.col]) || is_num((unsigned char)line[cur.col])) {
             while (cur.col + 1 < len && (is_word((unsigned char)line[cur.col + 1]) || is_num((unsigned char)line[cur.col + 1]))) cur.col++;
           } else {
-            while (cur.col + 1 < len && is_symble((unsigned char)line[cur.col + 1])) cur.col++;
+            while (cur.col + 1 < len && is_symbol((unsigned char)line[cur.col + 1])) cur.col++;
           }
           break;
         }
       }
     } else {
-      if (cur.col + 1 < len && is_symble((unsigned char)line[cur.col + 1])) {
-        while (cur.col + 1 < len && is_symble((unsigned char)line[cur.col + 1])) cur.col++;
+      if (cur.col + 1 < len && is_symbol((unsigned char)line[cur.col + 1])) {
+        while (cur.col + 1 < len && is_symbol((unsigned char)line[cur.col + 1])) cur.col++; 
         break;
       } else {
         cur.col++;

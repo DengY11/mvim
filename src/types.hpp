@@ -11,3 +11,5 @@ enum class Mode { Normal, Insert, Command, Visual, VisualLine };
 
 struct Cursor { int row = 0; int col = 0; };
 struct Viewport { int top_line = 0; int left_col = 0; };
+
+struct SearchHit { int row = 0; int col = 0; int len = 0; };
