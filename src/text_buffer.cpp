@@ -78,71 +78,64 @@ bool TextBuffer::write_file(const std::filesystem::path& path, std::string& msg)
     msg = std::string("write file failed: ") + tmp.string();
     return false;
   }
-  std::string out;
   int n = line_count();
-  if (n <= 0) {
-    out = std::string();
-  } else {
-    std::vector<size_t> lens(static_cast<size_t>(n));
-    unsigned hw = std::thread::hardware_concurrency(); if (hw == 0) hw = 4;
-    if (n >= 1024 && hw > 1) {
-      unsigned t = std::min<unsigned>(hw, static_cast<unsigned>(n / 1024)); t = std::max(t, 2u);
-      size_t per = (static_cast<size_t>(n) + t - 1) / t;
-      std::vector<std::future<void>> futs;
-      for (unsigned k = 0; k < t; ++k) {
-        size_t i0 = k * per; size_t i1 = std::min(static_cast<size_t>(n), (k + 1) * per);
-        if (i0 >= i1) break;
-        futs.emplace_back(std::async(std::launch::async, [&, i0, i1]{
-          for (size_t i = i0; i < i1; ++i) lens[i] = line(static_cast<int>(i)).size();
-        }));
-      }
-      for (auto& f : futs) f.get();
-    } else {
-      for (int i = 0; i < n; ++i) lens[static_cast<size_t>(i)] = line(i).size();
+  std::vector<char> buf(static_cast<size_t>(TB_WRITE_CHUNK_SIZE));
+  size_t used = 0;
+  auto flush_buf = [&](int fd) -> bool {
+    const char* p = buf.data();
+    size_t remain = used;
+    while (remain > 0) {
+      ssize_t w = ::write(fd, p, remain);
+      if (w < 0) { msg = std::string("write file failed: ") + tmp.string(); return false; }
+      p += w;
+      remain -= static_cast<size_t>(w);
     }
-    std::vector<size_t> pos(static_cast<size_t>(n));
-    size_t total = 0;
-    for (int i = 0; i < n; ++i) {
-      pos[static_cast<size_t>(i)] = total;
-      total += lens[static_cast<size_t>(i)];
-      if (i + 1 < n) total += 1; // newline
+    used = 0;
+    return true;
+  };
+  auto write_span = [&](int fd, const char* p, size_t len) -> bool {
+    size_t remain = len;
+    const char* q = p;
+    while (remain > 0) {
+      ssize_t w = ::write(fd, q, remain);
+      if (w < 0) { msg = std::string("write file failed: ") + tmp.string(); return false; }
+      q += w;
+      remain -= static_cast<size_t>(w);
     }
-    out.resize(total);
-    char* out_data = out.data();
-    // 并行拷贝内容
-    if (n >= 1024 && hw > 1) {
-      unsigned t = std::min<unsigned>(hw, static_cast<unsigned>(n / 1024)); t = std::max(t, 2u);
-      size_t per = (static_cast<size_t>(n) + t - 1) / t;
-      std::vector<std::future<void>> futs;
-      for (unsigned k = 0; k < t; ++k) {
-        size_t i0 = k * per; size_t i1 = std::min(static_cast<size_t>(n), (k + 1) * per);
-        if (i0 >= i1) break;
-        futs.emplace_back(std::async(std::launch::async, [&, i0, i1]{
-          for (size_t i = i0; i < i1; ++i) {
-            std::string s = line(static_cast<int>(i));
-            size_t p = pos[i];
-            std::memcpy(out_data + p, s.data(), s.size());
-            if (i + 1 < static_cast<size_t>(n)) out_data[p + s.size()] = '\n';
-          }
-        }));
+    return true;
+  };
+  for (int i = 0; i < n; ++i) {
+    std::string s = line(i);
+    bool need_nl = (i + 1 < n);
+    if (s.size() + (need_nl ? 1u : 0u) > buf.size() - used) {
+      if (used > 0) {
+        if (!flush_buf(ufd.get())) return false;
       }
-      for (auto& f : futs) f.get();
-    } else {
-      for (int i = 0; i < n; ++i) {
-        std::string s = line(i);
-        size_t p0 = pos[static_cast<size_t>(i)];
-        std::memcpy(out_data + p0, s.data(), s.size());
-        if (i + 1 < n) out_data[p0 + s.size()] = '\n';
+      if (s.size() >= buf.size()) {
+        if (!write_span(ufd.get(), s.data(), s.size())) return false;
+        if (need_nl) {
+          char nl = '\n';
+          if (!write_span(ufd.get(), &nl, 1)) return false;
+        }
+        continue;
+      }
+    }
+    std::memcpy(buf.data() + used, s.data(), s.size());
+    used += s.size();
+    if (need_nl) {
+      if (used == buf.size()) {
+        if (!flush_buf(ufd.get())) return false;
+      }
+      if (used < buf.size()) {
+        buf[used++] = '\n';
+      } else {
+        char nl = '\n';
+        if (!write_span(ufd.get(), &nl, 1)) return false;
       }
     }
   }
-  const char* p = out.data();
-  size_t remain = out.size();
-  while (remain > 0) {
-    ssize_t w = ::write(ufd.get(), p, remain);
-    if (w < 0) { msg = std::string("write file failed: ") + tmp.string(); return false; }
-    p += w;
-    remain -= static_cast<size_t>(w);
+  if (used > 0) {
+    if (!flush_buf(ufd.get())) return false;
   }
 #if defined(__APPLE__)
   if (::fsync(ufd.get()) != 0) { msg = std::string("write file failed: ") + tmp.string(); return false; }

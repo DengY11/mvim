@@ -19,3 +19,7 @@
 #else
 #define TB_BACKEND_NAME "unknown"
 #endif
+
+#ifndef TB_WRITE_CHUNK_SIZE
+#define TB_WRITE_CHUNK_SIZE (4 * 1024 * 1024)
+#endif
