@@ -28,5 +28,7 @@ public:
               Cursor visual_anchor,
               bool show_line_numbers,
               bool enable_color,
-              const std::vector<SearchHit>& search_hits);
+              const std::vector<SearchHit>& search_hits,
+              int insert_override_row,
+              const std::string& insert_override_line);
 };

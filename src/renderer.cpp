@@ -58,7 +58,9 @@ void Renderer::render(ITerminal& term,
                       Cursor visual_anchor,
                       bool show_line_numbers,
                       bool enable_color,
-                      const std::vector<SearchHit>& search_hits) {
+                      const std::vector<SearchHit>& search_hits,
+                      int insert_override_row,
+                      const std::string& insert_override_line) {
   TermSize sz = term.getSize();
   int rows = sz.rows, cols = sz.cols;
   term.clear();
@@ -95,7 +97,7 @@ void Renderer::render(ITerminal& term,
   for (int i = 0; i < max_text_rows; ++i) {
     int line_idx = vp.top_line + i;
     if (line_idx >= buf.line_count()) break;
-    const auto& s = buf.line(line_idx);
+    const auto& s = (line_idx == insert_override_row) ? insert_override_line : buf.line(line_idx);
     int s_len = static_cast<int>(s.size());
     int start_col = std::min(std::max(0, vp.left_col), s_len);
     int end_col = std::min(s_len, start_col + std::max(0, text_cols));
@@ -257,7 +259,7 @@ void Renderer::render(ITerminal& term,
   int screen_row = cur.row - vp.top_line;
   if (screen_row >= 0 && screen_row < max_text_rows) {
     int want_col = cur.col;
-  int line_len = static_cast<int>(buf.line(cur.row).size());
+    int line_len = (cur.row == insert_override_row) ? (int)insert_override_line.size() : (int)buf.line(cur.row).size();
     if (want_col > line_len) want_col = line_len;
     int screen_col = indent + std::max(0, want_col - std::max(0, vp.left_col));
     screen_col = std::min(screen_col, cols - 1);

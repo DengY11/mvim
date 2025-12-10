@@ -87,7 +87,11 @@ void Editor::begin_group() { um.begin_group(cur); }
 void Editor::commit_group() { um.commit_group(cur); }
 void Editor::push_op(const Operation& op) { um.push_op(op); }
 
-void Editor::render() { renderer.render(term, buf, cur, vp, mode, file_path, modified, message, cmdline, visual_active, visual_anchor, show_line_numbers, enable_color, last_search_hits); }
+void Editor::render() {
+  int override_row = insert_buffer_active ? insert_buffer_row : -1;
+  const std::string& override_line = insert_buffer_active ? insert_buffer_line : std::string();
+  renderer.render(term, buf, cur, vp, mode, file_path, modified, message, cmdline, visual_active, visual_anchor, show_line_numbers, enable_color, last_search_hits, override_row, override_line);
+}
 
 void Editor::handle_input(int ch) {
   if (enable_mouse && ch == KEY_MOUSE) { handle_mouse(); return; }
@@ -209,39 +213,77 @@ void Editor::handle_normal_input(int ch) {
 }
 
 void Editor::handle_insert_input(int ch) {
-  if (ch == ESC) { commit_group(); mode = Mode::Normal; return; }
-  if (ch == KEY_BACKSPACE || ch == 127) { backspace(); return; }
+  if (ch == ESC) { commit_insert_buffer(); commit_group(); mode = Mode::Normal; return; }
+  if (ch == KEY_BACKSPACE || ch == 127) { apply_backspace(); return; }
   if (ch == '\t') {
-    std::string s = buf.line(cur.row);
+    if (!insert_buffer_active || insert_buffer_row != cur.row) begin_insert_buffer();
     int n = std::max(1, tab_width);
-    for (int i = 0; i < n; ++i) {
-      s.insert(s.begin() + std::min(cur.col, (int)s.size()), ' ');
-      push_op({Operation::InsertChar, cur.row, cur.col, std::string(1, ' '), std::string()});
-      modified = true;
-      cur.col++;
-    }
-    buf.replace_line(cur.row, s);
-    um.clear_redo();
+    for (int i = 0; i < n; ++i) { apply_insert_char(' '); }
     return;
   }
   if (ch == '('|| ch == '{'||ch == '[') {
     if (auto_pair) {
-      insert_pair(ch);
+      if (!insert_buffer_active || insert_buffer_row != cur.row) begin_insert_buffer();
+      char opening = (char)ch;
+      char closing = (opening=='(')?')':(opening=='{'?'}':']');
+      apply_insert_char(opening);
+      if (!(cur.col < (int)insert_buffer_line.size() && insert_buffer_line[cur.col] == closing)) {
+        apply_insert_char(closing);
+        cur.col = std::max(0, cur.col - 1);
+      }
       return;
     }
   }
-  if (ch == '\n' || ch == KEY_ENTER || ch == '\r') { split_line_at_cursor(); return; }
+  if (ch == '\n' || ch == KEY_ENTER || ch == '\r') { commit_insert_buffer(); split_line_at_cursor(); begin_insert_buffer(); return; }
   if (ch >= 32 && ch <= 126) {
-    std::string s = buf.line(cur.row);
-    if (cur.col < 0) cur.col = 0;
-    if (cur.col > static_cast<int>(s.size())) cur.col = static_cast<int>(s.size());
-    s.insert(s.begin() + cur.col, static_cast<char>(ch));
-    push_op({Operation::InsertChar, cur.row, cur.col, std::string(1, static_cast<char>(ch)), std::string()});
-    modified = true;
-    cur.col++;
-    buf.replace_line(cur.row, s);
-    um.clear_redo();
+    apply_insert_char(ch);
     return;
+  }
+}
+
+void Editor::begin_insert_buffer() {
+  insert_buffer_active = true;
+  insert_buffer_row = cur.row;
+  insert_buffer_line = buf.line(cur.row);
+}
+
+void Editor::apply_insert_char(int ch) {
+  if (!insert_buffer_active || insert_buffer_row != cur.row) begin_insert_buffer();
+  if (cur.col < 0) cur.col = 0;
+  if (cur.col > static_cast<int>(insert_buffer_line.size())) cur.col = static_cast<int>(insert_buffer_line.size());
+  insert_buffer_line.insert(insert_buffer_line.begin() + cur.col, static_cast<char>(ch));
+  push_op({Operation::InsertChar, cur.row, cur.col, std::string(1, (char)ch), std::string()});
+  modified = true;
+  cur.col++;
+}
+
+void Editor::apply_backspace() {
+  if (!insert_buffer_active || insert_buffer_row != cur.row) begin_insert_buffer();
+  if (cur.col > 0) {
+    char c = insert_buffer_line[cur.col - 1];
+    insert_buffer_line.erase(insert_buffer_line.begin() + cur.col - 1);
+    push_op({Operation::DeleteChar, cur.row, cur.col - 1, std::string(1, c), std::string()});
+    cur.col--; modified = true;
+  } else {
+    // At line start: commit buffer then use existing merge logic
+    commit_insert_buffer();
+    backspace();
+    begin_insert_buffer();
+  }
+}
+
+void Editor::commit_insert_buffer() {
+  if (insert_buffer_active) {
+    std::string old = buf.line(insert_buffer_row);
+    std::string neu = insert_buffer_line;
+    if (old != neu) {
+      push_op({Operation::ReplaceLine, insert_buffer_row, cur.col, old, neu});
+      buf.replace_line(insert_buffer_row, neu);
+      um.clear_redo();
+    }
+    insert_buffer_active = false;
+    insert_buffer_row = -1;
+    insert_buffer_line.clear();
   }
 }
 

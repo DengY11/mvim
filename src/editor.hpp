@@ -48,6 +48,9 @@ private:
   bool auto_pair = false;
   enum class PendingOp { None, Delete, Yank };
   PendingOp pending_op = PendingOp::None;
+  bool insert_buffer_active = false;
+  int insert_buffer_row = -1;
+  std::string insert_buffer_line;
 
   void render();
   void handle_input(int ch);
@@ -55,6 +58,10 @@ private:
   void handle_insert_input(int ch);
   void handle_command_input(int ch);
   void handle_mouse();
+  void begin_insert_buffer();
+  void apply_insert_char(int ch);
+  void apply_backspace();
+  void commit_insert_buffer();
   void execute_command();
   void register_commands();
   void move_left();
