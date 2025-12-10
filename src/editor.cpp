@@ -353,7 +353,8 @@ void Editor::handle_mouse() {
   int rel = screen_col - indent;
   int buf_col = vp.left_col + rel;
   int line_len = (buf_row >= 0 && buf_row < buf.line_count()) ? (int)buf.line(buf_row).size() : 0;
-  buf_col = std::clamp(buf_col, 0, line_len);
+  int maxc = virtualedit_onemore ? line_len : (line_len > 0 ? line_len - 1 : 0);
+  buf_col = std::clamp(buf_col, 0, maxc);
   if (me.bstate & (BUTTON1_CLICKED | BUTTON1_PRESSED | BUTTON1_RELEASED | BUTTON1_DOUBLE_CLICKED)) {
     cur.row = buf_row; cur.col = buf_col;
   }
@@ -681,9 +682,12 @@ void Editor::yank_selection() {
 }
 
 void Editor::move_left() { if (cur.col > 0) cur.col--; }
-void Editor::move_right() { cur.col = std::min((int)buf.line(cur.row).size(), cur.col + 1); }
-void Editor::move_up() { if (cur.row > 0) { cur.row--; cur.col = std::min(cur.col, (int)buf.line(cur.row).size()); } }
-void Editor::move_down() { if (cur.row + 1 < buf.line_count()) { cur.row++; cur.col = std::min(cur.col, (int)buf.line(cur.row).size()); } }
+void Editor::move_right() {
+  int maxc = max_col_for_row(cur.row);
+  cur.col = std::min(maxc, cur.col + 1);
+}
+void Editor::move_up() { if (cur.row > 0) { cur.row--; cur.col = std::min(cur.col, max_col_for_row(cur.row)); } }
+void Editor::move_down() { if (cur.row + 1 < buf.line_count()) { cur.row++; cur.col = std::min(cur.col, max_col_for_row(cur.row)); } }
 
 void Editor::delete_char() {
   std::string s = buf.line(cur.row);
@@ -846,12 +850,12 @@ void Editor::redo() {
 
 void Editor::move_to_top() {
   cur.row = 0;
-  cur.col = std::min(cur.col, (int)buf.line(cur.row).size());
+  cur.col = std::min(cur.col, max_col_for_row(cur.row));
 }
 
 void Editor::move_to_bottom() {
   cur.row = buf.line_count() - 1;
-  cur.col = std::min(cur.col, (int)buf.line(cur.row).size());
+  cur.col = std::min(cur.col, max_col_for_row(cur.row));
 }
 
 /*
@@ -1011,7 +1015,7 @@ void Editor::move_to_beginning_of_line() {
 }
 
 void Editor::move_to_end_of_line() {
-  cur.col = (int)buf.line(cur.row).size();
+  cur.col = max_col_for_row(cur.row);
 }
 
 void Editor::scroll_up_half_page() {
@@ -1021,7 +1025,7 @@ void Editor::scroll_up_half_page() {
   int half = std::max(1, max_text_rows / 2);
   vp.top_line = std::max(0, vp.top_line - half);
   cur.row = std::max(0, cur.row - half);
-  cur.col = std::min(cur.col, (int)buf.line(cur.row).size());
+  cur.col = std::min(cur.col, max_col_for_row(cur.row));
 }
 
 void Editor::scroll_down_half_page() {
@@ -1031,11 +1035,18 @@ void Editor::scroll_down_half_page() {
   int max_top = std::max(0, buf.line_count() - max_text_rows);
   vp.top_line = std::min(max_top, vp.top_line + half);
   cur.row = std::min(buf.line_count() - 1, cur.row + half);
-  cur.col = std::min(cur.col, (int)buf.line(cur.row).size());
+  cur.col = std::min(cur.col, max_col_for_row(cur.row));
 }
 
 void Editor::set_tab_width(int width) {
   int w = std::max(1, width);
   tab_width = w;
   message = std::string("tabwidth=") + std::to_string(w);
+}
+
+int Editor::max_col_for_row(int row) const {
+  if (row < 0 || row >= buf.line_count()) return 0;
+  int len = (int)buf.line(row).size();
+  if (virtualedit_onemore) return len;
+  return (len > 0) ? (len - 1) : 0;
 }

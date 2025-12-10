@@ -107,6 +107,18 @@ void Editor::register_commands() {
     message = "backend=";
     message += buf.backend_name();
   });
+  registry.register_command("set onemore", [this](const std::vector<std::string>& args){
+    if (args.empty()){
+      virtualedit_onemore = !virtualedit_onemore;
+      message = virtualedit_onemore ? "onemore on" : "onemore off";
+    } else {
+      message = "set onemore: use :set onemore on|off";
+      std::string opt = args[0];
+      if (opt == "on") { virtualedit_onemore = true; message = "onemore on"; }
+      else if (opt == "off") { virtualedit_onemore = false; message = "onemore off"; }
+      else { message = "set onemore: use :set onemore on|off"; }
+    }
+  });
   registry.register_command("set mouse", [this](const std::vector<std::string>& args){
     if (args.empty()){
       enable_mouse = !enable_mouse;

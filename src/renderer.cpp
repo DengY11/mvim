@@ -162,12 +162,10 @@ void Renderer::render(ITerminal& term,
       return true;
     };
     std::string vis_line = s.substr(start_col, end_col - start_col);
-    // Search highlight (disable during visual selection)
     auto draw_with_search_highlight = [&](const std::string& full_line, int row_screen, int start_col_full, int end_col_full){
-      // collect hits in this line
+      (void)full_line;
       std::vector<SearchHit> hits;
       for (const auto& h : search_hits) if (h.row == line_idx) hits.push_back(h);
-      // filter visible range
       std::vector<SearchHit> vis_hits;
       for (const auto& h : hits) {
         int h_start = h.col;

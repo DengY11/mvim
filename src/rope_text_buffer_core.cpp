@@ -3,7 +3,6 @@
 #include <numeric>
 
 static constexpr size_t LEAF_MAX_LINES = 128;
-static constexpr size_t LEAF_MIN_LINES = 64;
 
 void RopeTextBufferCore::recalc(Node* n) {
   if (!n) return;
