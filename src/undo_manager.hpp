@@ -28,6 +28,8 @@ public:
   bool can_redo() const;
   void undo(TextBuffer& buf, Cursor& cur);
   void redo(TextBuffer& buf, Cursor& cur);
+  size_t undo_size() const { return undo_entries_.size(); }
+  const UndoEntry* last_entry() const { return undo_entries_.empty() ? nullptr : &undo_entries_.back(); }
 
 private:
   std::vector<UndoEntry> undo_entries_;
@@ -35,4 +37,3 @@ private:
   bool grouping_ = false;
   UndoEntry current_;
 };
-

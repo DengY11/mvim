@@ -24,6 +24,22 @@ bool Input::consumeGg(int ch) {
   return false;
 }
 
+bool Input::consumeGt(int ch) {
+  if (ch == '>') {
+    if (pending_gt_) { pending_gt_ = false; return true; }
+    pending_gt_ = true; return false;
+  }
+  return false;
+}
+
+bool Input::consumeLt(int ch) {
+  if (ch == '<') {
+    if (pending_lt_) { pending_lt_ = false; return true; }
+    pending_lt_ = true; return false;
+  }
+  return false;
+}
+
 bool Input::consumeDigit(int ch) {
   if (ch >= '1' && ch <= '9') {
     pending_count_ = pending_count_ * 10 + static_cast<size_t>(ch - '0');
@@ -52,4 +68,6 @@ void Input::reset() {
   pending_d_ = false;
   pending_y_ = false;
   pending_g_ = false;
+  pending_gt_ = false;
+  pending_lt_ = false;
 }

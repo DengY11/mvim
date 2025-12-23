@@ -24,7 +24,8 @@ static inline bool is_symbol(unsigned char c) {
 }
 static int next_word_start_same_line(const std::string& line, int col) {
   int len = static_cast<int>(line.size());
-  if (col < 0) col = 0; if (col > len) col = len;
+  if (col < 0) col = 0;
+  if (col > len) col = len;
   if (col >= len) return len;
   unsigned char c = static_cast<unsigned char>(line[col]);
   if (is_space(c)) {
@@ -40,7 +41,8 @@ static int next_word_start_same_line(const std::string& line, int col) {
 }
 static int next_word_end_same_line(const std::string& line, int col) {
   int len = static_cast<int>(line.size());
-  if (col < 0) col = 0; if (col > len) col = len;
+  if (col < 0) col = 0;
+  if (col > len) col = len;
   if (col >= len) return len;
   unsigned char c = static_cast<unsigned char>(line[col]);
   if (is_space(c)) {
@@ -84,13 +86,20 @@ void Editor::run() {
 }
 
 void Editor::begin_group() { um.begin_group(cur); }
-void Editor::commit_group() { um.commit_group(cur); }
+void Editor::commit_group() {
+  size_t before = um.undo_size();
+  um.commit_group(cur);
+  size_t after = um.undo_size();
+  if (after > before) {
+    if (const UndoEntry* e = um.last_entry()) last_change = *e;
+  }
+}
 void Editor::push_op(const Operation& op) { um.push_op(op); }
 
 void Editor::render() {
   int override_row = insert_buffer_active ? insert_buffer_row : -1;
   const std::string& override_line = insert_buffer_active ? insert_buffer_line : std::string();
-  renderer.render(term, buf, cur, vp, mode, file_path, modified, message, cmdline, visual_active, visual_anchor, show_line_numbers, enable_color, last_search_hits, override_row, override_line);
+  renderer.render(term, buf, cur, vp, mode, file_path, modified, message, cmdline, visual_active, visual_anchor, show_line_numbers, relative_line_numbers, enable_color, last_search_hits, override_row, override_line);
 }
 
 void Editor::handle_input(int ch) {
@@ -101,7 +110,7 @@ void Editor::handle_input(int ch) {
 }
 
 void Editor::handle_normal_input(int ch) {
-  if (ch != 'd' && ch != 'y' && ch != 'g') input.reset();
+  if (ch != 'd' && ch != 'y' && ch != 'g' && ch != '>' && ch != '<') input.reset();
   switch (ch) {
     case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': case '9':
       if (input.consumeDigit(ch)) break;
@@ -125,8 +134,25 @@ void Editor::handle_normal_input(int ch) {
     case 'x': begin_group(); delete_char(); commit_group(); break;
     case 'i': begin_group(); mode = Mode::Insert; break;
     case 'a': begin_group(); cur.col = std::min((int)buf.line(cur.row).size(), cur.col + 1); mode = Mode::Insert; break;
-    case 'o': begin_group(); insert_line_below(); mode = Mode::Insert; break;
-    case 'O': begin_group(); insert_line_above(); mode = Mode::Insert; break;
+    case 'o': {
+      std::string indent; if (auto_indent) indent = compute_indent_for_line(cur.row);
+      begin_group();
+      insert_line_below();
+      if (auto_indent && !indent.empty()) apply_indent_to_newline(indent);
+      mode = Mode::Insert;
+    } break;
+    case 'O': {
+      std::string indent; if (auto_indent) indent = compute_indent_for_line(cur.row);
+      begin_group();
+      insert_line_above();
+      if (auto_indent && !indent.empty()) apply_indent_to_newline(indent);
+      mode = Mode::Insert;
+    } break;
+    case '.':
+      repeat_last_change();
+      pending_op = PendingOp::None;
+      input.reset();
+      break;
     case ':': mode = Mode::Command; cmdline.clear(); break;
     case '/': mode = Mode::Command; cmdline = "/"; break;
     case '?': mode = Mode::Command; cmdline = "?"; break;
@@ -216,6 +242,42 @@ void Editor::handle_normal_input(int ch) {
     case 'N': {
       size_t k = input.takeCount(); if (k == 0) k = 1; while (k--) repeat_last_search(!last_search_forward);
     } break;
+    case '>': {
+      if (mode == Mode::Visual || mode == Mode::VisualLine) {
+        int r0, r1, c0, c1; get_visual_range(r0, r1, c0, c1);
+        begin_group();
+        indent_lines(r0, r1 - r0 + 1);
+        commit_group();
+        exit_visual();
+        input.reset();
+        break;
+      }
+      if (input.consumeGt('>')) {
+        size_t n = input.takeCount(); if (n == 0) n = 1;
+        begin_group();
+        indent_lines(cur.row, (int)n);
+        commit_group();
+        input.reset();
+      }
+    } break;
+    case '<': {
+      if (mode == Mode::Visual || mode == Mode::VisualLine) {
+        int r0, r1, c0, c1; get_visual_range(r0, r1, c0, c1);
+        begin_group();
+        dedent_lines(r0, r1 - r0 + 1);
+        commit_group();
+        exit_visual();
+        input.reset();
+        break;
+      }
+      if (input.consumeLt('<')) {
+        size_t n = input.takeCount(); if (n == 0) n = 1;
+        begin_group();
+        dedent_lines(cur.row, (int)n);
+        commit_group();
+        input.reset();
+      }
+    } break;
     default: input.reset(); break;
   }
 }
@@ -242,7 +304,20 @@ void Editor::handle_insert_input(int ch) {
       return;
     }
   }
-  if (ch == '\n' || ch == KEY_ENTER || ch == '\r') { commit_insert_buffer(); split_line_at_cursor(); begin_insert_buffer(); return; }
+  if (ch == '\n' || ch == KEY_ENTER || ch == '\r') {
+    std::string indent;
+    if (auto_indent) {
+      if (insert_buffer_active && insert_buffer_row == cur.row) indent = compute_indent_for_line(cur.row);
+      else indent = compute_indent_for_line(cur.row);
+    }
+    begin_group();
+    commit_insert_buffer();
+    split_line_at_cursor();
+    if (auto_indent) apply_indent_to_newline(indent);
+    commit_group();
+    begin_insert_buffer();
+    return;
+  }
   if (ch >= 32 && ch <= 126) {
     apply_insert_char(ch);
     return;
@@ -490,6 +565,18 @@ void Editor::load_rc() {
     execute_command();
     cmdline = old;
   }
+}
+
+static std::vector<std::string> split_block_lines(const std::string& block) {
+  std::vector<std::string> lines;
+  size_t st = 0;
+  while (st <= block.size()) {
+    size_t pos = block.find('\n', st);
+    if (pos == std::string::npos) { lines.emplace_back(block.substr(st)); break; }
+    lines.emplace_back(block.substr(st, pos - st));
+    st = pos + 1;
+  }
+  return lines;
 }
 
 static std::vector<int> kmp_build(const std::string& pat) {
@@ -1053,6 +1140,162 @@ void Editor::scroll_down_half_page() {
   vp.top_line = std::min(max_top, vp.top_line + half);
   cur.row = std::min(buf.line_count() - 1, cur.row + half);
   cur.col = std::min(cur.col, max_col_for_row(cur.row));
+}
+
+void Editor::apply_operation_forward(const Operation& op, int row_delta, int col_delta) {
+  auto clamp_row_existing = [&](int r) {
+    int max_row = std::max(0, buf.line_count() - 1);
+    return std::clamp(r, 0, max_row);
+  };
+  auto clamp_row_insert = [&](int r) {
+    int max_row = std::max(0, buf.line_count());
+    return std::clamp(r, 0, max_row);
+  };
+  switch (op.type) {
+    case Operation::InsertChar: {
+      int row = clamp_row_existing(op.row + row_delta);
+      std::string s = buf.line(row);
+      int col = std::clamp(op.col + col_delta, 0, (int)s.size());
+      s.insert(s.begin() + col, op.payload[0]);
+      buf.replace_line(row, s);
+      push_op({Operation::InsertChar, row, col, std::string(1, op.payload[0]), std::string()});
+      modified = true;
+    } break;
+    case Operation::DeleteChar: {
+      int row = clamp_row_existing(op.row + row_delta);
+      std::string s = buf.line(row);
+      if (s.empty()) break;
+      int col = std::clamp(op.col + col_delta, 0, (int)s.size() - 1);
+      char removed = s[col];
+      s.erase(s.begin() + col);
+      buf.replace_line(row, s);
+      push_op({Operation::DeleteChar, row, col, std::string(1, removed), std::string()});
+      modified = true;
+    } break;
+    case Operation::InsertLine: {
+      int row = clamp_row_insert(op.row + row_delta);
+      buf.insert_line(row, op.payload);
+      push_op({Operation::InsertLine, row, 0, op.payload, std::string()});
+      modified = true;
+    } break;
+    case Operation::DeleteLine: {
+      int row = clamp_row_existing(op.row + row_delta);
+      std::string removed = buf.line(row);
+      buf.erase_line(row);
+      push_op({Operation::DeleteLine, row, 0, removed, std::string()});
+      modified = true;
+    } break;
+    case Operation::ReplaceLine: {
+      int row = clamp_row_existing(op.row + row_delta);
+      std::string old_line = buf.line(row);
+      std::string new_line = op.alt_payload;
+      buf.replace_line(row, new_line);
+      push_op({Operation::ReplaceLine, row, op.col + col_delta, old_line, new_line});
+      modified = true;
+    } break;
+    case Operation::InsertLinesBlock: {
+      int row = clamp_row_insert(op.row + row_delta);
+      auto lines = split_block_lines(op.payload);
+      if (lines.empty()) lines.emplace_back("");
+      buf.insert_lines(row, lines);
+      push_op({Operation::InsertLinesBlock, row, 0, op.payload, std::string()});
+      modified = true;
+    } break;
+    case Operation::DeleteLinesBlock: {
+      int row = clamp_row_existing(op.row + row_delta);
+      if (row >= buf.line_count()) break;
+      auto source_count = static_cast<int>(split_block_lines(op.payload).size());
+      if (source_count <= 0) source_count = 1;
+      int end = std::min(buf.line_count(), row + source_count);
+      std::string block;
+      for (int r = row; r < end; ++r) {
+        if (r > row) block.push_back('\n');
+        block += buf.line(r);
+      }
+      if (end > row) {
+        push_op({Operation::DeleteLinesBlock, row, 0, block, std::string()});
+        buf.erase_lines(row, end);
+        modified = true;
+      }
+    } break;
+  }
+}
+
+void Editor::repeat_last_change() {
+  if (!last_change || last_change->ops.empty()) {
+    message = "no last change";
+    return;
+  }
+  int row_delta = cur.row - last_change->pre.row;
+  int col_delta = cur.col - last_change->pre.col;
+  Cursor target{cur.row + (last_change->post.row - last_change->pre.row),
+                cur.col + (last_change->post.col - last_change->pre.col)};
+  begin_group();
+  for (const auto& op : last_change->ops) apply_operation_forward(op, row_delta, col_delta);
+  um.clear_redo();
+  commit_group();
+  cur.row = std::clamp(target.row, 0, std::max(0, buf.line_count() - 1));
+  cur.col = std::clamp(target.col, 0, max_col_for_row(cur.row));
+}
+
+std::string Editor::compute_indent_for_line(int row) const {
+  if (row < 0 || row >= buf.line_count()) return std::string();
+  std::string line = buf.line(row);
+  size_t i = 0;
+  while (i < line.size() && (line[i] == ' ' || line[i] == '\t')) i++;
+  return line.substr(0, i);
+}
+
+void Editor::apply_indent_to_newline(const std::string& indent) {
+  if (indent.empty()) return;
+  int target_row = cur.row;
+  if (target_row < 0 || target_row >= buf.line_count()) return;
+  std::string line = buf.line(target_row);
+  if (line.rfind(indent, 0) == 0) {
+    cur.col = std::min<int>(indent.size(), max_col_for_row(target_row));
+    return;
+  }
+  std::string old_line = line;
+  std::string new_line = indent + line;
+  buf.replace_line(target_row, new_line);
+  push_op({Operation::ReplaceLine, target_row, 0, old_line, new_line});
+  modified = true;
+  cur.col = std::min<int>(indent.size(), static_cast<int>(new_line.size()));
+}
+
+void Editor::indent_lines(int start_row, int count) {
+  if (count <= 0) return;
+  int end = std::min(buf.line_count(), start_row + count);
+  std::string pad(std::max(1, tab_width), ' ');
+  for (int r = start_row; r < end; ++r) {
+    std::string old = buf.line(r);
+    std::string neu = pad + old;
+    push_op({Operation::ReplaceLine, r, 0, old, neu});
+    buf.replace_line(r, neu);
+    modified = true;
+  }
+}
+
+void Editor::dedent_lines(int start_row, int count) {
+  if (count <= 0) return;
+  int end = std::min(buf.line_count(), start_row + count);
+  int max_cols = std::max(1, tab_width);
+  for (int r = start_row; r < end; ++r) {
+    std::string old = buf.line(r);
+    size_t remove_bytes = 0;
+    int removed_cols = 0;
+    while (remove_bytes < old.size() && removed_cols < max_cols) {
+      char c = old[remove_bytes];
+      if (c == '\t') { remove_bytes++; removed_cols += max_cols; break; }
+      if (c == ' ') { remove_bytes++; removed_cols++; continue; }
+      break;
+    }
+    if (remove_bytes == 0) continue;
+    std::string neu = old.substr(remove_bytes);
+    push_op({Operation::ReplaceLine, r, 0, old, neu});
+    buf.replace_line(r, neu);
+    modified = true;
+  }
 }
 
 void Editor::set_tab_width(int width) {

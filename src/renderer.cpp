@@ -5,6 +5,7 @@
 #include <string>
 #include <algorithm>
 #include <cstring>
+#include <cstdlib>
 
 static std::string toLower(std::string s){ for(char& c: s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c))); return s; }
 static const std::unordered_set<std::string>& keywordsForExt(const std::string& ext){
@@ -58,6 +59,7 @@ void Renderer::render(ITerminal& term,
                       bool visual_active,
                       Cursor visual_anchor,
                       bool show_line_numbers,
+                      bool relative_line_numbers,
                       bool enable_color,
                       const std::vector<SearchHit>& search_hits,
                       int insert_override_row,
@@ -103,7 +105,12 @@ void Renderer::render(ITerminal& term,
     int start_col = std::min(std::max(0, vp.left_col), s_len);
     int end_col = std::min(s_len, start_col + std::max(0, text_cols));
     if (show_line_numbers) {
-      std::string num = std::to_string(line_idx + 1);
+      int display_num = line_idx + 1;
+      if (relative_line_numbers) {
+        int dist = std::abs(line_idx - cur.row);
+        display_num = (dist == 0) ? (line_idx + 1) : dist;
+      }
+      std::string num = std::to_string(display_num);
       std::string pad(std::max(0, ln_width - static_cast<int>(num.size())), ' ');
       term.draw_text(i, 0, pad + num + " ");
     }

@@ -36,6 +36,18 @@ void Editor::register_commands() {
       else { message = "set number: use :set number on|off"; }
     }
   });
+  registry.register_command("set relativenumber", [this](const std::vector<std::string>& args){
+    if (args.empty()){
+      relative_line_numbers = !relative_line_numbers;
+      message = relative_line_numbers ? "relativenumber on" : "relativenumber off";
+    } else {
+      message = "set relativenumber: use :set relativenumber on|off";
+      std::string opt = args[0];
+      if (opt == "on") { relative_line_numbers = true; message = "relativenumber on"; }
+      else if (opt == "off") { relative_line_numbers = false; message = "relativenumber off"; }
+      else { message = "set relativenumber: use :set relativenumber on|off"; }
+    }
+  });
   registry.register_command("set pair", [this](const std::vector<std::string>& args){
     if (args.empty()){
       if (auto_pair) { auto_pair = false; message = "auto-pair off"; }
@@ -161,6 +173,17 @@ void Editor::register_commands() {
         message = "mouse off";
       }
       else { message = "set mouse: use :set mouse on|off"; }
+    }
+  });
+  registry.register_command("set autoindent", [this](const std::vector<std::string>& args){
+    if (args.empty()) {
+      auto_indent = !auto_indent;
+      message = auto_indent ? "autoindent on" : "autoindent off";
+    } else {
+      std::string opt = args[0];
+      if (opt == "on") { auto_indent = true; message = "autoindent on"; }
+      else if (opt == "off") { auto_indent = false; message = "autoindent off"; }
+      else { message = "set autoindent: use :set autoindent on|off"; }
     }
   });
 }

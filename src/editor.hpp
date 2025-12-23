@@ -28,9 +28,12 @@ private:
   Mode mode = Mode::Normal;
   int tab_width = 4;
   bool show_line_numbers = false;
-  bool enable_color = true;
+  bool relative_line_numbers = false;
+  bool enable_color = false;
+  bool auto_indent = false;
   bool enable_mouse = false;
   UndoManager um;
+  std::optional<UndoEntry> last_change;
   bool modified = false;
   bool should_quit = false;
   std::optional<std::filesystem::path> file_path;
@@ -110,4 +113,10 @@ private:
   void set_tab_width(int width);
   void insert_pair(int ch);
   void load_rc();
+  void repeat_last_change();
+  void apply_operation_forward(const Operation& op, int row_delta, int col_delta);
+  void indent_lines(int start_row, int count);
+  void dedent_lines(int start_row, int count);
+  std::string compute_indent_for_line(int row) const;
+  void apply_indent_to_newline(const std::string& indent);
 };

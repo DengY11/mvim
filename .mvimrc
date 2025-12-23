@@ -2,3 +2,4 @@ set color on
 set background black
 set tabwidth 4
 set number on
+set autoindent on
