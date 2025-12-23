@@ -2,6 +2,7 @@
 #include <fstream>
 #include <unistd.h>
 #include <fcntl.h>
+#include <cstring>
 #include "posix_fd.hpp"
 #include <sys/stat.h>
 #include "file_reader.hpp"
