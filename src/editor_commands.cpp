@@ -3,6 +3,11 @@
 #include <algorithm>
 #include <cctype>
 #include <string>
+#include <filesystem>
+
+#define buf (doc().buf)
+#define modified (doc().modified)
+#define file_path (doc().file_path)
 
 void Editor::register_commands() {
   registry.register_command("w", [this](const std::vector<std::string>& args){
@@ -12,16 +17,15 @@ void Editor::register_commands() {
     else { message = "don't have path, use :w <path>"; }
   });
   registry.register_command("q", [this](const std::vector<std::string>&){
-    if (modified) { message = "have unsaved changes, use :w or :q! quit"; }
-    else { should_quit = true; }
+    close_or_quit(false);
   });
-  registry.register_command("q!", [this](const std::vector<std::string>&){ should_quit = true; });
+  registry.register_command("q!", [this](const std::vector<std::string>&){ close_or_quit(true); });
   registry.register_command("wq", [this](const std::vector<std::string>& args){
     std::string mm;
-    if (file_path) { if (buf.write_file(*file_path, mm)) { modified = false; should_quit = true; } message = mm; }
+    if (file_path) { if (buf.write_file(*file_path, mm)) { modified = false; close_or_quit(true); } message = mm; }
     else {
-      if (!args.empty()) { if (buf.write_file(args[0], mm)) { modified = false; should_quit = true; } message = mm; }
-      else { if (!modified) { should_quit = true; message = "dont have path, and no changes, quit"; } else { message = "dont have path: use :wq <path>"; } }
+      if (!args.empty()) { if (buf.write_file(args[0], mm)) { modified = false; close_or_quit(true); } message = mm; }
+      else { if (!modified) { close_or_quit(true); message = "dont have path, and no changes, quit"; } else { message = "dont have path: use :wq <path>"; } }
     }
   });
   registry.register_command("set number", [this](const std::vector<std::string>& args){
@@ -186,4 +190,53 @@ void Editor::register_commands() {
       else { message = "set autoindent: use :set autoindent on|off"; }
     }
   });
+  registry.register_command("vsplit", [this](const std::vector<std::string>& args){
+    std::optional<std::filesystem::path> p;
+    if (!args.empty()) p = std::filesystem::path(args[0]);
+    split_vertical(p);
+  });
+  registry.register_command("vsp", [this](const std::vector<std::string>& args){
+    std::optional<std::filesystem::path> p;
+    if (!args.empty()) p = std::filesystem::path(args[0]);
+    split_vertical(p);
+  });
+  registry.register_command("hsplit", [this](const std::vector<std::string>& args){
+    std::optional<std::filesystem::path> p;
+    if (!args.empty()) p = std::filesystem::path(args[0]);
+    split_horizontal(p);
+  });
+  registry.register_command("split", [this](const std::vector<std::string>& args){
+    std::optional<std::filesystem::path> p;
+    if (!args.empty()) p = std::filesystem::path(args[0]);
+    split_horizontal(p);
+  });
+  registry.register_command("sp", [this](const std::vector<std::string>& args){
+    std::optional<std::filesystem::path> p;
+    if (!args.empty()) p = std::filesystem::path(args[0]);
+    split_horizontal(p);
+  });
+  registry.register_command("close", [this](const std::vector<std::string>&){
+    if (!close_active_pane()) message = "cannot close last pane";
+  });
+  registry.register_command("focus", [this](const std::vector<std::string>& args){
+    if (args.empty()) { message = "focus <index>"; return; }
+    try {
+      int idx = std::stoi(args[0]) - 1;
+      set_active_pane(idx);
+    } catch (...) {
+      message = "focus <index>";
+    }
+  });
+  registry.register_command("edit", [this](const std::vector<std::string>& args){
+    if (args.empty()) { message = "edit <file> [more files]"; return; }
+    open_path_in_pane(active_pane, args[0]);
+    for (size_t i = 1; i < args.size(); ++i) {
+      std::filesystem::path p = args[i];
+      split_vertical(p);
+    }
+  });
 }
+
+#undef buf
+#undef modified
+#undef file_path

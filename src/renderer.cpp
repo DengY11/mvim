@@ -27,7 +27,7 @@ static const std::unordered_set<std::string>& keywordsForExt(const std::string& 
   return def;
 }
 
-static void render_welcome_mvim(ITerminal& term, int rows, int cols, int indent){
+static void render_welcome_mvim(ITerminal& term, int rows, int cols, int indent, int row_off, int col_off){
   const char* art[] = {
     "MM   MM   V     V    I    MM   MM",
     "M M M M    V   V     I    M M M M",
@@ -42,18 +42,14 @@ static void render_welcome_mvim(ITerminal& term, int rows, int cols, int indent)
   for(int i=0;i<lines;i++){ int len = static_cast<int>(std::strlen(art[i])); if(len>max_len) max_len = len; }
   int start_col = indent + std::max(0, (text_cols - max_len) / 2);
   for(int i=0;i<lines;i++){
-    term.draw_text(start_row + i, start_col, std::string(art[i]));
-    term.clear_to_eol(start_row + i, start_col + static_cast<int>(std::strlen(art[i])));
+    term.draw_text(row_off + start_row + i, col_off + start_col, std::string(art[i]));
+    term.clear_to_eol(row_off + start_row + i, col_off + start_col + static_cast<int>(std::strlen(art[i])));
   }
 }
 
 void Renderer::render(ITerminal& term,
-                      const TextBuffer& buf,
-                      const Cursor& cur,
-                      Viewport& vp,
+                      const std::vector<PaneRenderInfo>& panes,
                       Mode mode,
-                      const std::optional<std::filesystem::path>& file_path,
-                      bool modified,
                       const std::string& message,
                       const std::string& cmdline,
                       bool visual_active,
@@ -61,218 +57,248 @@ void Renderer::render(ITerminal& term,
                       bool show_line_numbers,
                       bool relative_line_numbers,
                       bool enable_color,
-                      const std::vector<SearchHit>& search_hits,
-                      int insert_override_row,
-                      const std::string& insert_override_line) {
-  TermSize sz = term.getSize();
-  int rows = sz.rows, cols = sz.cols;
+                      const std::vector<SearchHit>& search_hits) {
   term.clear();
-  int max_text_rows = rows - 1;
-  if (cur.row < vp.top_line) vp.top_line = cur.row;
-  if (cur.row >= vp.top_line + max_text_rows) vp.top_line = cur.row - max_text_rows + 1;
-  int ln_width = 0;
-  int indent = 0;
-  if (show_line_numbers) {
-    int digits = 1;
-    int total = std::max(1, buf.line_count());
-    while (total >= 10) { total /= 10; digits++; }
-    ln_width = digits;
-    indent = ln_width + 1; // one space after numbers
-  }
-  std::string ext;
-  if (file_path) {
-    auto e = file_path->extension().string();
-    if (!e.empty() && e[0]=='.') e = e.substr(1);
-    ext = toLower(e);
-  }
-  const auto& kwords_global = keywordsForExt(ext);
-  int text_cols = std::max(0, cols - indent);
-  if (text_cols <= 0) vp.left_col = 0;
-  if (text_cols > 0) {
-    if (cur.col < vp.left_col) vp.left_col = cur.col;
-    else if (cur.col >= vp.left_col + text_cols) vp.left_col = cur.col - text_cols + 1;
-    if (vp.left_col < 0) vp.left_col = 0;
-  }
-  bool show_welcome = (!file_path && buf.line_count() == 1 && buf.line(0).empty());
-  if (show_welcome) {
-    render_welcome_mvim(term, rows, cols, indent);
-  } else {
-  for (int i = 0; i < max_text_rows; ++i) {
-    int line_idx = vp.top_line + i;
-    if (line_idx >= buf.line_count()) break;
-    const auto& s = (line_idx == insert_override_row) ? insert_override_line : buf.line(line_idx);
-    int s_len = static_cast<int>(s.size());
-    int start_col = std::min(std::max(0, vp.left_col), s_len);
-    int end_col = std::min(s_len, start_col + std::max(0, text_cols));
+  int cursor_row = 0;
+  int cursor_col = 0;
+  bool cursor_set = false;
+  for (const auto& pane : panes) {
+    if (!pane.buf || !pane.vp) continue;
+    const TextBuffer& buf = *pane.buf;
+    const Cursor& cur = pane.cur;
+    Viewport& vp = *pane.vp;
+    int rows = pane.area.height;
+    int cols = pane.area.width;
+    int row_off = pane.area.row;
+    int col_off = pane.area.col;
+    if (rows <= 0 || cols <= 0) continue;
+    // borders
+    if (rows >= 2 && cols >= 2) {
+      std::string top(cols, '-'); top.front() = '+'; top.back() = '+';
+      term.draw_text(row_off, col_off, top);
+      term.draw_text(row_off + rows - 1, col_off, top);
+      for (int r = 1; r < rows - 1; ++r) {
+        term.draw_text(row_off + r, col_off, "|");
+        term.draw_text(row_off + r, col_off + cols - 1, "|");
+      }
+    }
+    int inner_row_off = row_off + 1;
+    int inner_col_off = col_off + 1;
+    int inner_rows = rows - 2;
+    int inner_cols = cols - 2;
+    if (inner_rows <= 0 || inner_cols <= 0) continue;
+    int max_text_rows = inner_rows - 1; // reserve last inner row for status
+    if (max_text_rows <= 0) continue;
+    if (cur.row < vp.top_line) vp.top_line = cur.row;
+    if (cur.row >= vp.top_line + max_text_rows) vp.top_line = cur.row - max_text_rows + 1;
+    int ln_width = 0;
+    int indent = 0;
     if (show_line_numbers) {
-      int display_num = line_idx + 1;
-      if (relative_line_numbers) {
-        int dist = std::abs(line_idx - cur.row);
-        display_num = (dist == 0) ? (line_idx + 1) : dist;
-      }
-      std::string num = std::to_string(display_num);
-      std::string pad(std::max(0, ln_width - static_cast<int>(num.size())), ' ');
-      term.draw_text(i, 0, pad + num + " ");
+      int digits = 1;
+      int total = std::max(1, buf.line_count());
+      while (total >= 10) { total /= 10; digits++; }
+      ln_width = digits;
+      indent = ln_width + 1;
     }
-    if (visual_active) {
-      int r0 = std::min(visual_anchor.row, cur.row);
-      int r1 = std::max(visual_anchor.row, cur.row);
-      if (mode == Mode::VisualLine) {
-        if (line_idx >= r0 && line_idx <= r1) {
-          std::string vis = s.substr(start_col, end_col - start_col);
-          term.draw_highlighted(i, indent, vis, 0, static_cast<int>(vis.size()));
-          term.clear_to_eol(i, indent + static_cast<int>(vis.size()));
-        } else {
-          std::string vis = s.substr(start_col, end_col - start_col);
-          term.draw_text(i, indent, vis);
-          term.clear_to_eol(i, indent + static_cast<int>(vis.size()));
-        }
-      } else if (mode == Mode::Visual) {
-        auto is_ascii_line = [](const std::string& t){ for (unsigned char c : t) { if (c >= 128) return false; } return true; };
-        std::string vis = s.substr(start_col, end_col - start_col);
-        if (!is_ascii_line(vis)) {
-          if (line_idx >= r0 && line_idx <= r1) term.draw_highlighted(i, indent, vis, 0, (int)vis.size()); else term.draw_text(i, indent, vis);
-          term.clear_to_eol(i, indent + (int)vis.size());
-        } else {
-        if (line_idx == r0 && line_idx == r1) {
-          int c0 = std::min(visual_anchor.col, cur.col);
-          int c1 = std::max(visual_anchor.col, cur.col);
-          c0 = std::max(0, std::min(c0, static_cast<int>(s.size())));
-          c1 = std::max(0, std::min(c1, static_cast<int>(s.size())));
-          int hs = std::max(0, c0 - start_col);
-          int he = std::max(0, std::min(c1, end_col) - start_col);
-          int hlen = std::max(0, he - hs);
-          term.draw_highlighted(i, indent, vis, hs, hlen);
-        } else if (line_idx == r0) {
-          int c0 = std::min(visual_anchor.col, cur.col);
-          c0 = std::max(0, std::min(c0, static_cast<int>(s.size())));
-          int hs = std::max(0, c0 - start_col);
-          int hlen = std::max(0, end_col - std::max(start_col, c0));
-          term.draw_highlighted(i, indent, vis, hs, hlen);
-        } else if (line_idx == r1) {
-          int c1 = std::max(visual_anchor.col, cur.col);
-          c1 = std::max(0, std::min(c1, static_cast<int>(s.size())));
-          int hlen = std::max(0, std::min(c1, end_col) - start_col);
-          term.draw_highlighted(i, indent, vis, 0, hlen);
-        } else if (line_idx > r0 && line_idx < r1) {
-          term.draw_highlighted(i, indent, vis, 0, static_cast<int>(vis.size()));
-        } else {
-          term.draw_text(i, indent, vis);
-        }
-        term.clear_to_eol(i, indent + (int)vis.size());
-        }
-      } else {
-        term.draw_text(i, indent, s.substr(start_col, end_col - start_col));
-      }
+    std::string ext;
+    if (pane.file_path) {
+      auto e = pane.file_path->extension().string();
+      if (!e.empty() && e[0]=='.') e = e.substr(1);
+      ext = toLower(e);
     }
-    auto is_ascii_line = [](const std::string& t){
-      for (unsigned char c : t) { if (c >= 128) return false; }
-      return true;
-    };
-    std::string vis_line = s.substr(start_col, end_col - start_col);
-    auto draw_with_search_highlight = [&](const std::string& full_line, int row_screen, int start_col_full, int end_col_full){
-      (void)full_line;
-      std::vector<SearchHit> hits;
-      for (const auto& h : search_hits) if (h.row == line_idx) hits.push_back(h);
-      std::vector<SearchHit> vis_hits;
-      for (const auto& h : hits) {
-        int h_start = h.col;
-        int h_end = h.col + h.len;
-        if (h_end <= start_col_full || h_start >= end_col_full) continue;
-        int vis_start = std::max(h_start, start_col_full) - start_col_full;
-        int vis_len = std::min(h_end, end_col_full) - std::max(h_start, start_col_full);
-        if (vis_len > 0) vis_hits.push_back({line_idx, vis_start, vis_len});
-      }
-      if (vis_hits.empty()) {
-        term.draw_text(row_screen, indent, vis_line);
-        term.clear_to_eol(row_screen, indent + (int)vis_line.size());
-        return;
-      }
-      int col_draw = indent;
-      int cursor = 0;
-      // sort by start
-      std::sort(vis_hits.begin(), vis_hits.end(), [](const SearchHit& a, const SearchHit& b){ return a.col < b.col; });
-      for (const auto& h : vis_hits) {
-        if (h.col > cursor) {
-          term.draw_text(row_screen, col_draw, vis_line.substr(cursor, h.col - cursor));
-          col_draw += (h.col - cursor);
-          cursor = h.col;
-        }
-        int hl_len = h.len;
-        // Use a distinct color pair (3) for search highlight segments
-        term.draw_colored(row_screen, col_draw, vis_line.substr(cursor, hl_len), 3);
-        col_draw += hl_len;
-        cursor += hl_len;
-      }
-      if (cursor < (int)vis_line.size()) {
-        term.draw_text(row_screen, col_draw, vis_line.substr(cursor));
-        col_draw += (int)vis_line.size() - cursor;
-      }
-      term.clear_to_eol(row_screen, col_draw);
-    };
-
-    if (!visual_active && !search_hits.empty()) {
-      draw_with_search_highlight(s, i, start_col, end_col);
-    } else if (!visual_active && enable_color && is_ascii_line(vis_line)) {
-      auto isWord = [](unsigned char c){ return std::isalnum(c) != 0 || c == '_'; };
-      int cols = term.getSize().cols;
-      int col = indent;
-      int n = static_cast<int>(vis_line.size());
-      int p = 0;
-      while (p < n) {
-        if (!isWord(static_cast<unsigned char>(vis_line[p]))) {
-          int start = p;
-          while (p < n && !isWord(static_cast<unsigned char>(vis_line[p]))) p++;
-          term.draw_text(i, col, vis_line.substr(start, p - start));
-          col += (p - start);
-        } else {
-          int start = p;
-          while (p < n && isWord(static_cast<unsigned char>(vis_line[p]))) p++;
-          std::string tok = vis_line.substr(start, p - start);
-          if (kwords_global.find(tok) != kwords_global.end()) {
-            term.draw_colored(i, col, tok, 1);
-          } else {
-            term.draw_text(i, col, tok);
+    const auto& kwords_global = keywordsForExt(ext);
+    int text_cols = std::max(0, inner_cols - indent);
+    if (text_cols <= 0) vp.left_col = 0;
+    if (text_cols > 0) {
+      if (cur.col < vp.left_col) vp.left_col = cur.col;
+      else if (cur.col >= vp.left_col + text_cols) vp.left_col = cur.col - text_cols + 1;
+      if (vp.left_col < 0) vp.left_col = 0;
+    }
+    int insert_override_row = pane.override_row;
+    const std::string& insert_override_line = pane.override_line;
+    bool show_welcome = (!pane.file_path && buf.line_count() == 1 && buf.line(0).empty());
+    if (show_welcome) {
+      render_welcome_mvim(term, inner_rows, inner_cols, indent, inner_row_off, inner_col_off);
+    } else {
+      for (int i = 0; i < max_text_rows; ++i) {
+        int line_idx = vp.top_line + i;
+        if (line_idx >= buf.line_count()) break;
+        const auto& s = (line_idx == insert_override_row) ? insert_override_line : buf.line(line_idx);
+        int s_len = static_cast<int>(s.size());
+        int start_col = std::min(std::max(0, vp.left_col), s_len);
+        int end_col = std::min(s_len, start_col + std::max(0, text_cols));
+        if (show_line_numbers) {
+          int display_num = line_idx + 1;
+          if (relative_line_numbers) {
+            int dist = std::abs(line_idx - cur.row);
+            display_num = (dist == 0) ? (line_idx + 1) : dist;
           }
-          col += (p - start);
+          std::string num = std::to_string(display_num);
+          std::string pad(std::max(0, ln_width - static_cast<int>(num.size())), ' ');
+          term.draw_text(inner_row_off + i, inner_col_off + 0, pad + num + " ");
         }
-        if (col >= cols) break;
+        bool pane_visual = pane.is_active && visual_active;
+        if (pane_visual) {
+          int r0 = std::min(visual_anchor.row, cur.row);
+          int r1 = std::max(visual_anchor.row, cur.row);
+          if (mode == Mode::VisualLine) {
+            if (line_idx >= r0 && line_idx <= r1) {
+              std::string vis = s.substr(start_col, end_col - start_col);
+              term.draw_highlighted(inner_row_off + i, inner_col_off + indent, vis, 0, static_cast<int>(vis.size()));
+              term.clear_to_eol(inner_row_off + i, inner_col_off + indent + static_cast<int>(vis.size()));
+            } else {
+              std::string vis = s.substr(start_col, end_col - start_col);
+              term.draw_text(inner_row_off + i, inner_col_off + indent, vis);
+              term.clear_to_eol(inner_row_off + i, inner_col_off + indent + static_cast<int>(vis.size()));
+            }
+          } else if (mode == Mode::Visual) {
+            auto is_ascii_line = [](const std::string& t){ for (unsigned char c : t) { if (c >= 128) return false; } return true; };
+            std::string vis = s.substr(start_col, end_col - start_col);
+            if (!is_ascii_line(vis)) {
+              if (line_idx >= r0 && line_idx <= r1) term.draw_highlighted(inner_row_off + i, inner_col_off + indent, vis, 0, (int)vis.size()); else term.draw_text(inner_row_off + i, inner_col_off + indent, vis);
+              term.clear_to_eol(inner_row_off + i, inner_col_off + indent + (int)vis.size());
+            } else {
+              if (line_idx == r0 && line_idx == r1) {
+                int c0 = std::min(visual_anchor.col, cur.col);
+                int c1 = std::max(visual_anchor.col, cur.col);
+                c0 = std::max(0, std::min(c0, static_cast<int>(s.size())));
+                c1 = std::max(0, std::min(c1, static_cast<int>(s.size())));
+                int hs = std::max(0, c0 - start_col);
+                int he = std::max(0, std::min(c1, end_col) - start_col);
+                int hlen = std::max(0, he - hs);
+                term.draw_highlighted(inner_row_off + i, inner_col_off + indent, vis, hs, hlen);
+              } else if (line_idx == r0) {
+                int c0 = std::min(visual_anchor.col, cur.col);
+                c0 = std::max(0, std::min(c0, static_cast<int>(s.size())));
+                int hs = std::max(0, c0 - start_col);
+                int hlen = std::max(0, end_col - std::max(start_col, c0));
+                term.draw_highlighted(inner_row_off + i, inner_col_off + indent, vis, hs, hlen);
+              } else if (line_idx == r1) {
+                int c1 = std::max(visual_anchor.col, cur.col);
+                c1 = std::max(0, std::min(c1, static_cast<int>(s.size())));
+                int hlen = std::max(0, std::min(c1, end_col) - start_col);
+                term.draw_highlighted(inner_row_off + i, inner_col_off + indent, vis, 0, hlen);
+              } else if (line_idx > r0 && line_idx < r1) {
+                term.draw_highlighted(inner_row_off + i, inner_col_off + indent, vis, 0, static_cast<int>(vis.size()));
+              } else {
+                term.draw_text(inner_row_off + i, inner_col_off + indent, vis);
+              }
+              term.clear_to_eol(inner_row_off + i, inner_col_off + indent + (int)vis.size());
+            }
+          } else {
+            term.draw_text(inner_row_off + i, inner_col_off + indent, s.substr(start_col, end_col - start_col));
+          }
+        }
+        auto is_ascii_line = [](const std::string& t){
+          for (unsigned char c : t) { if (c >= 128) return false; }
+          return true;
+        };
+        std::string vis_line = s.substr(start_col, end_col - start_col);
+        auto draw_with_search_highlight = [&](const std::string& full_line, int row_screen, int start_col_full, int end_col_full){
+          (void)full_line;
+          std::vector<SearchHit> hits;
+          for (const auto& h : search_hits) if (h.row == line_idx) hits.push_back(h);
+          std::vector<SearchHit> vis_hits;
+          for (const auto& h : hits) {
+            int h_start = h.col;
+            int h_end = h.col + h.len;
+            if (h_end <= start_col_full || h_start >= end_col_full) continue;
+            int vis_start = std::max(h_start, start_col_full) - start_col_full;
+            int vis_len = std::min(h_end, end_col_full) - std::max(h_start, start_col_full);
+            if (vis_len > 0) vis_hits.push_back({line_idx, vis_start, vis_len});
+          }
+          if (vis_hits.empty()) {
+            term.draw_text(row_screen, inner_col_off + indent, vis_line);
+            term.clear_to_eol(row_screen, inner_col_off + indent + (int)vis_line.size());
+            return;
+          }
+          int col_draw = inner_col_off + indent;
+          int cursor = 0;
+          std::sort(vis_hits.begin(), vis_hits.end(), [](const SearchHit& a, const SearchHit& b){ return a.col < b.col; });
+          for (const auto& h : vis_hits) {
+            if (h.col > cursor) {
+              term.draw_text(row_screen, col_draw, vis_line.substr(cursor, h.col - cursor));
+              col_draw += (h.col - cursor);
+              cursor = h.col;
+            }
+            int hl_len = h.len;
+            term.draw_colored(row_screen, col_draw, vis_line.substr(cursor, hl_len), 3);
+            col_draw += hl_len;
+            cursor += hl_len;
+          }
+          if (cursor < (int)vis_line.size()) {
+            term.draw_text(row_screen, col_draw, vis_line.substr(cursor));
+            col_draw += (int)vis_line.size() - cursor;
+          }
+          term.clear_to_eol(row_screen, col_draw);
+        };
+
+        if (!pane_visual && pane.is_active && !search_hits.empty()) {
+          draw_with_search_highlight(s, inner_row_off + i, start_col, end_col);
+        } else if (!pane_visual && enable_color && is_ascii_line(vis_line)) {
+          auto isWord = [](unsigned char c){ return std::isalnum(c) != 0 || c == '_'; };
+          int col = inner_col_off + indent;
+          int n = static_cast<int>(vis_line.size());
+          int p = 0;
+          while (p < n) {
+            if (!isWord(static_cast<unsigned char>(vis_line[p]))) {
+              int start = p;
+              while (p < n && !isWord(static_cast<unsigned char>(vis_line[p]))) p++;
+              term.draw_text(inner_row_off + i, col, vis_line.substr(start, p - start));
+              col += (p - start);
+            } else {
+              int start = p;
+              while (p < n && isWord(static_cast<unsigned char>(vis_line[p]))) p++;
+              std::string tok = vis_line.substr(start, p - start);
+              if (kwords_global.find(tok) != kwords_global.end()) {
+                term.draw_colored(inner_row_off + i, col, tok, 1);
+              } else {
+                term.draw_text(inner_row_off + i, col, tok);
+              }
+              col += (p - start);
+            }
+            if (col - inner_col_off >= inner_cols) break;
+          }
+        } else if (!pane_visual) {
+          term.draw_text(inner_row_off + i, inner_col_off + indent, vis_line);
+          term.clear_to_eol(inner_row_off + i, inner_col_off + indent + static_cast<int>(vis_line.size()));
+        }
       }
-    } else if (!visual_active) {
-      term.draw_text(i, indent, vis_line);
-      term.clear_to_eol(i, indent + static_cast<int>(vis_line.size()));
+    }
+    std::string mode_str = (mode == Mode::Normal ? "NORMAL" : mode == Mode::Insert ? "INSERT" : mode == Mode::Command ? "COMMAND" : mode == Mode::Visual ? "VISUAL" : "VISUAL-LINE");
+    std::ostringstream oss;
+    oss << mode_str << "  "
+        << (pane.file_path ? pane.file_path->string() : "[no file]")
+        << (pane.modified ? " [+]" : "")
+        << "  row:" << (cur.row + 1) << " col:" << (cur.col + 1);
+    if (pane.is_active && !message.empty() && mode != Mode::Command) oss << "  | " << message;
+    std::string command_str = ":";
+    if(mode == Mode::Command && pane.is_active && (cmdline.size()>0 && (cmdline[0]=='/'||cmdline[0]=='?'))){
+      command_str = cmdline;
+    }else{
+      command_str = ":" + cmdline;
+    }
+    std::string status = (mode == Mode::Command && pane.is_active) ? command_str : oss.str();
+    if (pane.is_active && visual_active && mode != Mode::Command) {
+      status += "  | VISUAL";
+      if (mode == Mode::VisualLine) status += "(LINE)";
+    }
+    term.draw_text(inner_row_off + inner_rows - 1, inner_col_off, status);
+    int screen_row = cur.row - vp.top_line;
+    if (pane.is_active && screen_row >= 0 && screen_row < max_text_rows) {
+      int want_col = cur.col;
+      int line_len = (cur.row == insert_override_row) ? (int)insert_override_line.size() : (int)buf.line(cur.row).size();
+      if (want_col > line_len) want_col = line_len;
+      int screen_col = indent + std::max(0, want_col - std::max(0, vp.left_col));
+      screen_col = std::min(screen_col, inner_cols - 1);
+      cursor_row = inner_row_off + screen_row;
+      cursor_col = inner_col_off + screen_col;
+      cursor_set = true;
     }
   }
+  if (!cursor_set) {
+    cursor_row = 0; cursor_col = 0;
   }
-  std::string mode_str = (mode == Mode::Normal ? "NORMAL" : mode == Mode::Insert ? "INSERT" : mode == Mode::Command ? "COMMAND" : mode == Mode::Visual ? "VISUAL" : "VISUAL-LINE");
-  std::ostringstream oss;
-  oss << mode_str << "  "
-      << (file_path ? file_path->string() : "[no file]")
-      << (modified ? " [+]" : "")
-      << "  row:" << (cur.row + 1) << " col:" << (cur.col + 1);
-  if (!message.empty() && mode != Mode::Command) oss << "  | " << message;
-  std::string command_str = ":";
-  if(mode == Mode::Command && (cmdline.size()>0 && (cmdline[0]=='/'||cmdline[0]=='?'))){
-    command_str = cmdline;
-  }else{
-    command_str = ":" + cmdline;
-  }
-  std::string status = mode == Mode::Command ? command_str : oss.str();
-  if (visual_active && mode != Mode::Command) {
-    status += "  | VISUAL";
-    if (mode == Mode::VisualLine) status += "(LINE)";
-  }
-  term.draw_text(rows - 1, 0, status);
-  int screen_row = cur.row - vp.top_line;
-  if (screen_row >= 0 && screen_row < max_text_rows) {
-    int want_col = cur.col;
-    int line_len = (cur.row == insert_override_row) ? (int)insert_override_line.size() : (int)buf.line(cur.row).size();
-    if (want_col > line_len) want_col = line_len;
-    int screen_col = indent + std::max(0, want_col - std::max(0, vp.left_col));
-    screen_col = std::min(screen_col, cols - 1);
-    term.move_cursor(screen_row, screen_col);
-  } else {
-    term.move_cursor(rows - 1, 0);
-  }
+  term.move_cursor(cursor_row, cursor_col);
   term.refresh();
 }

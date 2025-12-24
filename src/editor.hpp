@@ -10,6 +10,9 @@
 #include "renderer.hpp"
 #include "ncurses_terminal.hpp"
 #include "cmd_registry.hpp"
+#include "pane_layout.hpp"
+#include <memory>
+#include <unordered_map>
 
 class Editor {
 public:
@@ -17,14 +20,41 @@ public:
   void run();
 
 private:
+  struct Document {
+    TextBuffer buf;
+    UndoManager um;
+    std::optional<UndoEntry> last_change;
+    std::optional<std::filesystem::path> file_path;
+    bool modified = false;
+  };
+
+  struct Pane {
+    std::shared_ptr<Document> doc;
+    Cursor cur;
+    Viewport vp;
+  };
+
+  Pane& pane();
+  const Pane& pane() const;
+  Document& doc();
+  const Document& doc() const;
+  void set_active_pane(int idx);
+  int create_pane_from_file(const std::optional<std::filesystem::path>& file);
+  void split_vertical(const std::optional<std::filesystem::path>& file);
+  void split_horizontal(const std::optional<std::filesystem::path>& file);
+  bool close_active_pane();
+  bool close_or_quit(bool force);
+  int active_pane_count() const;
+  void open_path_in_pane(int idx, const std::filesystem::path& path);
+  void collect_layout(std::vector<PaneRect>& out) const;
+  void focus_next_pane();
+  void focus_direction(char dir);
+
   struct Register {
     std::vector<std::string> lines;
     bool linewise = true;
   } reg;
 
-  TextBuffer buf;
-  Cursor cur;
-  Viewport vp;
   Mode mode = Mode::Normal;
   int tab_width = 4;
   bool show_line_numbers = false;
@@ -32,11 +62,7 @@ private:
   bool enable_color = false;
   bool auto_indent = false;
   bool enable_mouse = false;
-  UndoManager um;
-  std::optional<UndoEntry> last_change;
-  bool modified = false;
   bool should_quit = false;
-  std::optional<std::filesystem::path> file_path;
   std::string message;
   std::string cmdline;
   Input input;
@@ -55,6 +81,11 @@ private:
   bool insert_buffer_active = false;
   int insert_buffer_row = -1;
   std::string insert_buffer_line;
+  std::vector<Pane> panes;
+  int active_pane = 0;
+  std::unique_ptr<SplitNode> layout;
+  std::unordered_map<std::string, std::weak_ptr<Document>> doc_table;
+  bool pending_ctrl_w = false;
 
   void render();
   void handle_input(int ch);

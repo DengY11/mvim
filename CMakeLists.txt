@@ -25,6 +25,7 @@ add_executable(mvim
   src/editor_commands.cpp
   src/editor.cpp
   src/undo_manager.cpp
+  src/pane_layout.cpp
 )
 target_compile_features(mvim PRIVATE cxx_std_20)
 
@@ -47,7 +48,9 @@ add_executable(mvim_tests
   src/gap_text_buffer_core.cpp
   src/rope_text_buffer_core.cpp
   src/file_reader.cpp
+  src/pane_layout.cpp
   tests/test_text_buffer.cpp
+  tests/test_layout.cpp
 )
 target_compile_features(mvim_tests PRIVATE cxx_std_20)
 target_compile_options(mvim_tests PRIVATE -Wall -Wextra -Wpedantic)

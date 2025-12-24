@@ -12,16 +12,25 @@
 #include "text_buffer.hpp"
 #include "types.hpp"
 #include "iterminal.hpp"
+#include "pane_layout.hpp"
+
+struct PaneRenderInfo {
+  const TextBuffer* buf = nullptr;
+  Cursor cur{};
+  Viewport* vp = nullptr;
+  std::optional<std::filesystem::path> file_path;
+  bool modified = false;
+  bool is_active = false;
+  Rect area{};
+  int override_row = -1;
+  std::string override_line;
+};
 
 class Renderer {
 public:
   void render(ITerminal& term,
-              const TextBuffer& buf,
-              const Cursor& cur,
-              Viewport& vp,
+              const std::vector<PaneRenderInfo>& panes,
               Mode mode,
-              const std::optional<std::filesystem::path>& file_path,
-              bool modified,
               const std::string& message,
               const std::string& cmdline,
               bool visual_active,
@@ -29,7 +38,5 @@ public:
               bool show_line_numbers,
               bool relative_line_numbers,
               bool enable_color,
-              const std::vector<SearchHit>& search_hits,
-              int insert_override_row,
-              const std::string& insert_override_line);
+              const std::vector<SearchHit>& search_hits);
 };

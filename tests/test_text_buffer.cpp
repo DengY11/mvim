@@ -3,6 +3,8 @@
 #include <string>
 #include <vector>
 
+void run_layout_tests();
+
 int main() {
   TextBuffer b;
   b.init_from_lines({"a", "b", "c"});
@@ -20,5 +22,6 @@ int main() {
   b.erase_lines(1, 3);
   assert(b.line_count() == 1);
   assert(b.line(0) == std::string("a"));
+  run_layout_tests();
   return 0;
 }
